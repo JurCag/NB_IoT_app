@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "main.h": "c",
+        "board.h": "c",
+        "freertos.h": "c",
+        "uart_struct.h": "c",
+        "uart.h": "c",
+        "gpio.h": "c",
+        "at_cmds.h": "c",
+        "sstream": "c",
+        "bg96_at_cmds_core.h": "c",
+        "esp_log.h": "c",
+        "stdint.h": "c",
+        "bg96_mqtt.h": "c",
+        "freertosconfig.h": "c",
+        "timers.h": "c",
+        "bg96.h": "c"
+    }
+}
