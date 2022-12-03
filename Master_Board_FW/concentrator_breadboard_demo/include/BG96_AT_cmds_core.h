@@ -51,7 +51,7 @@ typedef enum
     CONFIGURE_OPTIONAL_PARAMETERS,
     CONTROL_WHETHER_TO_ECHO_THE_DATA_FOR_AT_QISEND,
     QUERY_THE_LAST_ERROR_CODE
-} TCPIPRelatedATCommands_t;
+} TCPIPRelatedATCommand_t;
 
 typedef enum
 {
@@ -65,7 +65,7 @@ typedef enum
     PUBLISH_MESSAGES,
     PUBLISH_MESSAGES_WITH_COMMAND_MODE,
     READ_MESSAGES_FROM_BUFFERS
-} MQTTRelatedATCommands_t;
+} MQTTRelatedATCommand_t;
 
 typedef enum
 {

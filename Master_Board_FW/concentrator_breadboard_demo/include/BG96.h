@@ -47,10 +47,10 @@ typedef void (*BG96_txPacketCB_t)(char* packet);
 
 typedef enum
 {
-    TASK_IDLE   = 0,
-    TASK_RUN    = 1,
+    IDLE                = 0,
+    INITIALIZATION      = 1,
     SENDING_SENSOR_DATA = 2
-} TaskState_t;
+} FeedTxQueueState_t;
 
 // configTASK_NOTIFICATION_ARRAY_ENTRIES must be higher than 1
 // to use more notif indexes
@@ -61,23 +61,18 @@ typedef enum
     NOTIF_INDEX_1   = 1,
     NOTIF_INDEX_2   = 2,
     NOTIF_INDEX_3   = 3
-} NotificationIndexes_t;
+} NotificationIndex_t;
 
 /* Variables */
 ContextID_t contextID;
-char contextIdStr[8];
 SslContextID_t SSL_ctxID;
-char sslCtxIdStr[8];
 MqttSocketIdentifier_t client_idx;
-char clientIdxStr[8];
 QueueHandle_t rxDataQueue;
 
 /* Functions */
 void BG96_txStr(char* str);
 void BG96_txBytes(char* bytes, uint8_t len);
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
-void prepareArg(char** paramsArr, uint8_t numOfParams, char* arg);
-
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
 
 /* FreeRTOS */

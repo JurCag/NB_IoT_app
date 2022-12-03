@@ -27,51 +27,47 @@ void BG96_checkIfConnectedToMqttServer(void)
 
 void BG96_mqttConfigParams(void)
 {
-    static char* paramsArr[MAX_PARAMS];
+    static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
-    char tempStr[8];
 
     static MqttSslMode_t SSL_enable = USE_SECURE_SSL_TCP_FOR_MQTT;
     static MqttProtocolVersion_t vsn = MQTT_V_3_1_1;
     
     idx = 0;
-    paramsArr[idx++] = "\"ssl\"";
-    paramsArr[idx++] = clientIdxStr;
-    sprintf(tempStr, "%d", SSL_enable);
-    paramsArr[idx++] = tempStr;
-    paramsArr[idx++] = sslCtxIdStr;
-    prepareArg(paramsArr, idx, AT_configureOptionalParametersOfMQTT.arg);
+    paramsArr[idx++] = (void*) "\"ssl\"";
+    paramsArr[idx++] = (void*) &client_idx;
+    paramsArr[idx++] = (void*) &SSL_enable;
+    paramsArr[idx++] = (void*) &SSL_ctxID;
+    prepAtCmdArgs(AT_configureOptionalParametersOfMQTT.arg, paramsArr, idx);
     queueAtPacket(&AT_configureOptionalParametersOfMQTT, WRITE_COMMAND); 
 
     idx = 0;
-    paramsArr[idx++] = "\"version\"";
-    paramsArr[idx++] = clientIdxStr;
-    sprintf(tempStr, "%d", vsn);
-    paramsArr[idx++] = tempStr;
-    prepareArg(paramsArr, idx, AT_configureOptionalParametersOfMQTT.arg);
+    paramsArr[idx++] = (void*) "\"version\"";
+    paramsArr[idx++] = (void*) &client_idx;
+    paramsArr[idx++] = (void*) &vsn;
+    prepAtCmdArgs(AT_configureOptionalParametersOfMQTT.arg, paramsArr, idx);
     queueAtPacket(&AT_configureOptionalParametersOfMQTT, WRITE_COMMAND); 
 }
 
 
 void BG96_mqttOpenConn(void)
 {
-    static char* paramsArr[MAX_PARAMS];
+    static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
-    static uint16_t port = 8883;
-    char tempStr[8];
+
+    static char port[] = "8883";
 
     idx = 0;
-    paramsArr[idx++] = clientIdxStr;
-    paramsArr[idx++] = DEVICE_DATA_ENDPOINT_STR;
-    sprintf(tempStr, "%d", port);
-    paramsArr[idx++] = tempStr;
-    prepareArg(paramsArr, idx, AT_openNetworkConnectionForMQTTClient.arg);
+    paramsArr[idx++] = (void*) &client_idx;
+    paramsArr[idx++] = (void*) DEVICE_DATA_ENDPOINT_STR;
+    paramsArr[idx++] = (void*) port;
+    prepAtCmdArgs(AT_openNetworkConnectionForMQTTClient.arg, paramsArr, idx);
     queueAtPacket(&AT_openNetworkConnectionForMQTTClient, WRITE_COMMAND);
 }
 
 void BG96_mqttConnToServer(void)
 {
-    static char* paramsArr[MAX_PARAMS];
+    static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
 
     timerConnToServer = xTimerCreate(
@@ -97,9 +93,9 @@ void BG96_mqttConnToServer(void)
                     xTimerDelete(timerConnToServer, MS_TO_TICKS(50));
                 }
                 idx = 0;
-                paramsArr[idx++] = clientIdxStr;
-                paramsArr[idx++] = MQTT_BG96DEMO_CLIENT_ID_STR;
-                prepareArg(paramsArr, idx, AT_connectClientToMQTTServer.arg);
+                paramsArr[idx++] = (void*) &client_idx;
+                paramsArr[idx++] = (void*) MQTT_BG96DEMO_CLIENT_ID_STR;
+                prepAtCmdArgs(AT_connectClientToMQTTServer.arg, paramsArr, idx);
                 queueAtPacket(&AT_connectClientToMQTTServer, WRITE_COMMAND);
                 break;
             }
@@ -119,59 +115,6 @@ static void timerConnToServerCB(TimerHandle_t xTimer)
 {
     timerConnToServerExpired = 1;
 }
-
-/* void BG96_mqttConnToServer(void)
-{
-    timerConnToServer = xTimerCreate(
-                      "timerConnToServer",          // Name of timer
-                      MS_TO_TICKS(250),             // Period of timer (in ticks)
-                      pdTRUE,                       // Auto-reload
-                      (void *)0,                    // Timer ID
-                      timerConnToServerCB);         // Callback function
-
-    if (timerConnToServer != NULL)
-    {
-        dumpInfo("timerConnToServer: [START]\r\n");
-        xTimerStart(timerConnToServer, MS_TO_TICKS(10));
-    }
-} */
-
-/* static void timerConnToServerCB(TimerHandle_t xTimer)
-{
-    static char* paramsArr[MAX_PARAMS];
-    static uint8_t idx = 0;
-    static uint8_t cnt = 0;
-    static const uint32_t ulMaxExpiryCountBeforeStopping = 30;
-    
-    static char printMsg[40];
-    memset(printMsg, '\0', sizeof(printMsg));
-    sprintf(printMsg, "*%d", (cnt + 1));
-    dumpInfo(printMsg);
-
-    // Wait until connection is OPENed
-    if (mqttOpened == 1) // takes approx 3.8s
-    {
-        dumpInfo("Timer 1: [SUCCESS]\r\n");
-        sprintf(printMsg, "Iteration: [%d/%d]\r\n", (cnt + 1), ulMaxExpiryCountBeforeStopping);
-        dumpInfo(printMsg);
-        xTimerStop(xTimer, 0);
-
-        idx = 0;
-        paramsArr[idx++] = clientIdxStr;
-        paramsArr[idx++] = MQTT_BG96DEMO_CLIENT_ID_STR;
-        prepareArg(paramsArr, idx, AT_connectClientToMQTTServer.arg);
-        dumpInfo("Queued 1: [AT_connectClientToMQTTServer]\r\n");
-        queueAtPacket(&AT_connectClientToMQTTServer, WRITE_COMMAND);
-        dumpInfo("Queued 2: [AT_connectClientToMQTTServer]\r\n");
-    }
-    else if(cnt++ > ulMaxExpiryCountBeforeStopping)
-    {
-        dumpInfo("Timer 1: [EXPIRED]\r\n");
-        xTimerStop(xTimer, 0);
-        cnt = 0;
-    }
-
-} */
 
 void BG96_mqttCreatePayloadDataQueue(void)
 {
@@ -193,11 +136,9 @@ void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
 
 void BG96_mqttPubQueuedData(void)
 {
-    static char* paramsArr[MAX_PARAMS];
+    static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
-    char tempStr[8];
-    char tempStr2[8];
-    char tempStr3[8];
+
     static uint8_t retain = 0;
     static char* mqttTopic = "\"BG96_demoThing/sensors\"";
 
@@ -241,16 +182,14 @@ void BG96_mqttPubQueuedData(void)
                     timerPubData = NULL;
                 }
             }
+
             idx = 0;
-            paramsArr[idx++] = clientIdxStr;
-            sprintf(tempStr, "%d", msgID);
-            paramsArr[idx++] = tempStr;
-            sprintf(tempStr2, "%d", qos);
-            paramsArr[idx++] = tempStr2;
-            sprintf(tempStr3, "%d", retain);
-            paramsArr[idx++] = tempStr3;
-            paramsArr[idx++] = mqttTopic;
-            prepareArg(paramsArr, idx, AT_publishMessages.arg);
+            paramsArr[idx++] = (void*) &client_idx;
+            paramsArr[idx++] = (void*) &msgID;
+            paramsArr[idx++] = (void*) &qos;
+            paramsArr[idx++] = (void*) &retain;
+            paramsArr[idx++] = (void*) mqttTopic;
+            prepAtCmdArgs(AT_publishMessages.arg, paramsArr, idx);
             queueAtPacket(&AT_publishMessages, WRITE_COMMAND);
             break;
         }
@@ -270,79 +209,15 @@ static void timerPubDataCB(TimerHandle_t xTimer)
     timerPubDataExpired = 1;
 }
 
-/* void BG96_mqttPubQueuedData(void)
-{
-    // TODO: take and insert data into char payload[BUFFER_SIZE] = "{ \"sensorName\" : \"tempSensor\", \"data\" : 111}"; OR sensorDataQeue
-    timerPubData = xTimerCreate(
-                      "timerPubData",               // Name of timer
-                      MS_TO_TICKS(250),             // Period of timer (in ticks)
-                      pdTRUE,                       // Auto-reload
-                      (void *)1,                    // Timer ID
-                      timerPubDataCB);              // Callback function
-
-    if (timerPubData != NULL)
-    {
-        dumpInfo("timerPubData: [START]\r\n");
-        xTimerStart(timerPubData, MS_TO_TICKS(10));
-    }
-} */
-
-/* static void timerPubDataCB(TimerHandle_t xTimer)
-{
-    static char* paramsArr[MAX_PARAMS];
-    static uint8_t idx = 0;
-    static uint8_t cnt = 0;
-    static const uint32_t ulMaxExpiryCountBeforeStopping = 100;
-    char tempStr[8];
-    char tempStr2[8];
-    char tempStr3[8];
-    static uint8_t retain = 0;
-    static char* mqttTopic = "\"BG96_demoThing/sensors\"";
-
-    static char printMsg[40];
-    memset(printMsg, '\0', sizeof(printMsg));
-    sprintf(printMsg, "^%d", (cnt + 1));
-    dumpInfo(printMsg);
-
-    // Wait until CONNected to the server
-    if (mqttConnected == 1) // takes approx 200ms
-    {
-        xTimerStop(xTimer, 0); // stop timer before queueing atPacket
-        dumpInfo("Timer 2: [SUCCESS]\r\n");
-        sprintf(printMsg, "Iteration: [%d/%d]\r\n", (cnt + 1), ulMaxExpiryCountBeforeStopping);
-        dumpInfo(printMsg);
-
-        idx = 0;
-        paramsArr[idx++] = clientIdxStr;
-        sprintf(tempStr, "%d", msgID);
-        paramsArr[idx++] = tempStr;
-        sprintf(tempStr2, "%d", qos);
-        paramsArr[idx++] = tempStr2;
-        sprintf(tempStr3, "%d", retain);
-        paramsArr[idx++] = tempStr3;
-        paramsArr[idx++] = mqttTopic;
-        prepareArg(paramsArr, idx, AT_publishMessages.arg);
-        queueAtPacket(&AT_publishMessages, WRITE_COMMAND);
-    }
-    else if(cnt++ > ulMaxExpiryCountBeforeStopping)
-    {
-        dumpInfo("Timer 2: [EXPIRED]\r\n");
-        xTimerStop(xTimer, 0);
-        cnt = 0;
-    }
-} */
-
 void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
 {
     BG96_AtPacket_t tempPacket; // sent packet
     char tempData[BUFFER_SIZE];
-    // char payload[BUFFER_SIZE] = "{ \"sensorName\" : \"tempSensor\", \"data\" : 111}";
     static RxData_t rxData;
     static PayloadData_t payloadData;
 
     uint8_t expInfoArgs[8];
     static uint8_t i = 0;
-
 
     memcpy(&tempPacket, packet, sizeof(BG96_AtPacket_t));
     memcpy(tempData, data, BUFFER_SIZE);

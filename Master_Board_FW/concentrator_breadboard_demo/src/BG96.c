@@ -14,6 +14,7 @@ QueueHandle_t rxDataQueue = NULL;
 
 /* Local variables */
 static BG96_AtPacket_t deqdAtPacket;
+static char lastSentAtCmdStr[BUFFER_SIZE];
 static QueueHandle_t atPacketsTxQueue = NULL;
 static QueueHandle_t sensorDataQueue = NULL;
 static TaskHandle_t taskRxHandle = NULL;
@@ -38,7 +39,6 @@ static void powerUpModem(gpio_num_t pwrKeypin);
 static void swPowerDownModem(void);
 static void queueRxData(RxData_t rxData);
 static void queueSensorData(SensorData_t sensorData);
-static void initCommonConnParams(void);
 
 static uint8_t responseParser(void);
 static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
@@ -61,6 +61,8 @@ static void BG96_sendAtPacket(BG96_AtPacket_t* atPacket)
     static char atCmdBody[BUFFER_SIZE];
 
     BG96_buildAtCmdStr(atPacket, atCmdBody, BUFFER_SIZE);
+    memset(lastSentAtCmdStr, '\0', sizeof(lastSentAtCmdStr));
+    memcpy(lastSentAtCmdStr, atCmdBody, strlen(atCmdBody));
     BG96_txStr(atCmdBody);
 }
 
@@ -270,7 +272,7 @@ static void taskPowerUpModem(void *pvParameters)
 
 static void taskFeedTxQueue(void* pvParameters)
 {
-    static TaskState_t taskState = TASK_RUN;
+    static FeedTxQueueState_t taskState = INITIALIZATION;
     static SensorData_t sensorData;
     char payload1[BUFFER_SIZE] = "{ \"sensorName\" : \"TEST SENSOR\", \"data\" : 123456}";
     static uint32_t notifValue;
@@ -282,7 +284,7 @@ static void taskFeedTxQueue(void* pvParameters)
     {
         switch(taskState)
         {
-            case TASK_RUN:
+            case INITIALIZATION:
                 queueAtPacket(&AT_setCommandEchoMode, EXECUTION_COMMAND);
                 queueAtPacket(&AT_enterPIN, READ_COMMAND);
                 queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
@@ -290,7 +292,6 @@ static void taskFeedTxQueue(void* pvParameters)
                 queueAtPacket(&AT_attachmentOrDetachmentOfPS, READ_COMMAND);
                 
                 // BG96_checkIfConnectedToMqttServer();
-                initCommonConnParams();
 
                 BG96_sslConfigParams();
                 BG96_mqttConfigParams();
@@ -310,7 +311,6 @@ static void taskFeedTxQueue(void* pvParameters)
                 
                 break;
             case SENDING_SENSOR_DATA:
-                // TODO: problably not necessary, deleteTask?
                 dumpDebug("Ready to receive sensor data\r\n");
                 while(1)
                 {
@@ -342,7 +342,7 @@ static void taskTx(void *pvParameters)
             {
                 if (sendAttempt > 0)
                 {
-                    sprintf(resendAttemptsStr, "Resend attempt: [%d/%d]\r\n", (sendAttempt + 1), deqdAtPacket.atCmd->maxResendAttemps);
+                    sprintf(resendAttemptsStr, "Resend attempt: [%d/%d] %s\r\n", (sendAttempt + 1), deqdAtPacket.atCmd->maxResendAttemps, deqdAtPacket.atCmd->cmd);
                     dumpInfo(resendAttemptsStr);
                 }
 
@@ -350,6 +350,7 @@ static void taskTx(void *pvParameters)
                 parserResult = responseParser();
                 if (parserResult == EXIT_SUCCESS)
                 {
+                    // Notif that cmd sent
                     xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_1);
                     break;
                 }
@@ -365,11 +366,11 @@ static uint8_t responseParser(void)
 
     if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd->maxRespTime_ms)) == pdTRUE)
     {
-        BG96_buildAtCmdStr(&deqdAtPacket, sentCmdStr, BUFFER_SIZE);
-        sentCmdStr[strlen(sentCmdStr)-1] = '\0';    // remove '\n'
-        sentCmdStr[strlen(sentCmdStr)-1] = '\0';    // and remove '\r', otherwise might not match the response
+        // BG96_buildAtCmdStr(&lastSentAtPacket, sentCmdStr, BUFFER_SIZE);
+        lastSentAtCmdStr[strlen(lastSentAtCmdStr)-1] = '\0';    // remove '\n'
+        lastSentAtCmdStr[strlen(lastSentAtCmdStr)-1] = '\0';    // and remove '\r', otherwise might not match the response
 
-        if (strstr(rxData.b, sentCmdStr) != NULL) // or does the response matches exactly the cmd that was sent
+        if (strstr(rxData.b, lastSentAtCmdStr) != NULL) // or does the response matches exactly the cmd that was sent
         {
             if (strstr(rxData.b, deqdAtPacket.atCmd->confirmation) != NULL)
             {
@@ -402,6 +403,10 @@ static uint8_t responseParser(void)
                 }
             }
         }
+        else
+        {
+            dumpInfo("Response: [DOESN'T MATCH]\r\n");
+        }
     }
     else
     {
@@ -409,6 +414,7 @@ static uint8_t responseParser(void)
         return EXIT_FAILURE;
     }
 
+    dumpInfo("Response: [MISSING]\r\n");
     return EXIT_FAILURE;
 }
 
@@ -474,21 +480,24 @@ static void queueRxData(RxData_t rxData)
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t cmdType)
 {
     BG96_AtPacket_t xAtPacket;
-    static uint32_t notifValue;
     static uint8_t firstAtPacket = 1;
+    static const uint16_t timeToProcessResp = 1000;
+    static uint32_t waitForRespProcessed = 300;
     static char printMsg[40];
 
     xAtPacket.atCmd = cmd;
     xAtPacket.atCmdType = cmdType;
 
     // React's only to one index (notifs with other index leaves pending)
-    if ((notifValue = ulTaskNotifyTakeIndexed(NOTIF_INDEX_1, pdFALSE, MS_TO_TICKS(2*(cmd->maxRespTime_ms)))) > 0)
+    if (ulTaskNotifyTakeIndexed(NOTIF_INDEX_1, pdFALSE, MS_TO_TICKS(waitForRespProcessed)) > 0)
     {
+        waitForRespProcessed = cmd->maxRespTime_ms + (uint32_t)timeToProcessResp;
         xQueueSend(atPacketsTxQueue, &xAtPacket, 0);
     }
     else if (firstAtPacket == 1)
     {
         firstAtPacket = 0;
+        waitForRespProcessed = cmd->maxRespTime_ms + (uint32_t)timeToProcessResp;
         xQueueSend(atPacketsTxQueue, &xAtPacket, 0);
     }
     else
@@ -499,22 +508,11 @@ void queueAtPacket(AtCmd_t* cmd, AtCmdType_t cmdType)
     }
 }
 
-void prepareArg(char** paramsArr, uint8_t numOfParams, char* arg)
-{
-    memset(arg, '\0', ARG_LEN);
-    for (uint8_t i = 0; i < numOfParams; i++)
-    {
-        if (paramsArr[i] != NULL)
-        {
-            strcat(arg, paramsArr[i]);
-            strcat(arg, ",");
-        }
-    }
-    arg[strlen(arg)-1] = '\0';
-}
-
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
 {
+    // paramsArr can contain void pointers to arguments which can be either:
+    // a) strings - first char: '\"' or number
+    // b) uint8_t numbers - bigger than uint8_t must be in string
     static char paramStr[3];
     
     memset(arg, '\0', ARG_LEN);
@@ -523,12 +521,11 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
     {
         if (paramsArr[i] != NULL)
         {
-            // If param starts with " it's a string
-            if (*((char*)paramsArr[i]) == '\"')
+            if ((*((char*)paramsArr[i]) == '\"') || ((*((char*)paramsArr[i]) >= '0') && (*((char*)paramsArr[i]) <= '9')))
             {
                 strcat(arg, (char*)paramsArr[i]);
             }
-            else    // otherwise it's a number
+            else
             {
                 memset(paramStr, '\0', sizeof(paramStr));
                 sprintf(paramStr, "%d", *((uint8_t*)paramsArr[i]));
@@ -540,29 +537,17 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
     arg[strlen(arg)-1] = '\0';
 }
 
-static void initCommonConnParams(void)DUMP_INTER_COMM
-{
-    memset(contextIdStr, '\0', sizeof(contextIdStr));
-    sprintf(contextIdStr, "%d", contextID);
-    
-    memset(sslCtxIdStr, '\0', sizeof(sslCtxIdStr));
-    sprintf(sslCtxIdStr, "%d", SSL_ctxID);
-
-    memset(clientIdxStr, '\0', sizeof(clientIdxStr));
-    sprintf(clientIdxStr, "%d", client_idx);
-}
-
 void taskForwardSensorData(void* pvParameters)
 {
     static int readLen;
     static SensorData_t sensorData;
 
     
-    for (uint8_t i = 0; i < 10; i++)
+    for (uint8_t i = 0; i < 3; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "{ \"sensorName\" : \"%s\", \"data\" : %d%d%d}", "tempSensor", i+1,i+1,i+1);
-        dumpDebug("NEXT");
+        dumpDebug("NEXT ");
         dumpDebug(sensorData.b);
         BG96_mqttQueuePayloadData(sensorData);
         xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
