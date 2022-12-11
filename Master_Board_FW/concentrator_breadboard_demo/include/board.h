@@ -14,7 +14,7 @@
 #define UART_BG96_RX_PIN    (GPIO_NUM_1)
 
 #define UART_PC             (UART_NUM_0)
-#define UART_PC_TX_PIN      (GPIO_NUM_19)
-#define UART_PC_RX_PIN      (GPIO_NUM_18)
+#define UART_PC_TX_PIN      (GPIO_NUM_3)
+#define UART_PC_RX_PIN      (GPIO_NUM_2)
 
 #endif // __BOARD_H__
