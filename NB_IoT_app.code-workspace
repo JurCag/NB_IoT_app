@@ -2,6 +2,10 @@
 	"folders": [
 		{
 			"path": "Master_Board_FW/concentrator_breadboard_demo"
+		},
+		{
+			"name": "sensor_board_BME280",
+			"path": "Sensor_Boards_FW/sensor_board_BME280"
 		}
 	],
 	"settings": {
