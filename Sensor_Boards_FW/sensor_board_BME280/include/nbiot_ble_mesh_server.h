@@ -13,17 +13,16 @@
 #include "esp_ble_mesh_provisioning_api.h"
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_sensor_model_api.h"
-
 #include "ble_mesh_example_init.h"
-#include "board.h"
 #include "bt_mesh_properties.h"
+
 #include "sensor_bme280.h"
 
 
 #define CID_ESP     0x02E5
 uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN];
 
-#define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE   // NOTE:  0x000 – Unspecified Positive Sensor Tolerance
+#define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE   // 0x000 – Unspecified Positive Sensor Tolerance
 #define SENSOR_NEGATIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_NEG_TOLERANCE   // 0x000 – Unspecified Positive Sensor Tolerance
 #define SENSOR_SAMPLE_FUNCTION      ESP_BLE_MESH_SAMPLE_FUNC_UNSPECIFIED            // 0x00 – Unspecified
 #define SENSOR_MEASURE_PERIOD       ESP_BLE_MESH_SENSOR_NOT_APPL_MEASURE_PERIOD     // 0x00 – Not Applicable

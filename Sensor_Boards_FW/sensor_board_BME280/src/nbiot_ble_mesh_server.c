@@ -1,5 +1,4 @@
 #include "nbiot_ble_mesh_server.h"
-#define TAG "EXAMPLE"
 
 uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN] = { 0x32, 0x10 };
 
@@ -133,10 +132,7 @@ static esp_err_t bleMeshServerInit(void)
         return err;
     }
 
-    board_led_operation(LED_G, LED_ON);
-
     ESP_LOGI(tag, "BLE Mesh sensor server initialized");
-
     return ESP_OK;
 }
 
@@ -172,7 +168,7 @@ static void srvProvisioningCB(esp_ble_mesh_prov_cb_event_t event,
         ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_RESET_EVT");
         break;
     case ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT:
-        ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT, err_code %d",
+        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT, err_code %d",
                 param->node_set_unprov_dev_name_comp.err_code);
         break;
     default:
@@ -443,9 +439,7 @@ static void sendSensorServerStatus(esp_ble_mesh_sensor_server_cb_param_t *param)
     int i;
     static const char* tag = __func__;
 
-    ESP_LOGI(tag, "1 numOfSensorStates is: %d",numOfSensorStates);
     updateSensorData(); // PIN SPOT updateSensorData
-    ESP_LOGI(tag, "2 numOfSensorStates is: %d",numOfSensorStates);
 
     /**
      * Sensor Data state from Mesh Model Spec
@@ -475,7 +469,7 @@ static void sendSensorServerStatus(esp_ble_mesh_sensor_server_cb_param_t *param)
             }
         }
     }
-    ESP_LOGI(tag, "3Calloc buffsize is: %d",buf_size);
+
     status = calloc(1, buf_size);
     if (!status) 
     {

@@ -4,7 +4,7 @@ NET_BUF_SIMPLE_DEFINE_STATIC(temperatureSensorData, 1);
 NET_BUF_SIMPLE_DEFINE_STATIC(humiditySensorData, 1);
 NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 1);
 
-/* Sensor Property ID */
+/* Sensor Property ID based on sensor */
 #define SENSOR_PROPERTY_ID_0        BT_MESH_PROP_ID_PRESENT_AMB_TEMP
 #define SENSOR_PROPERTY_ID_1        BT_MESH_PROP_ID_PRESENT_AMB_REL_HUMIDITY
 #define SENSOR_PROPERTY_ID_2        BT_MESH_PROP_ID_PRESSURE
@@ -13,31 +13,15 @@ static void nodeBme280UpdateData(void);
 
 static esp_ble_mesh_sensor_state_t nodeSensorStates[] =
 {
-    /* Mesh Model Spec:
-     * Multiple instances of the Sensor states may be present within the same model,
-     * provided that each instance has a unique value of the Sensor Property ID to
-     * allow the instances to be differentiated. Such sensors are known as multisensors.
-     * In this example, two instances of the Sensor states within the same model are
-     * provided.
-     */
     {
-        /* Mesh Model Spec:
-         * Sensor Property ID is a 2-octet value referencing a device property
-         * that describes the meaning and format of data reported by a sensor.
-         * 0x0000 is prohibited.
-         */
         .sensor_property_id = SENSOR_PROPERTY_ID_0,
-        /* Mesh Model Spec:
-         * Sensor Descriptor state represents the attributes describing the sensor
-         * data. This state does not change throughout the lifetime of an element.
-         */
         .descriptor.positive_tolerance = SENSOR_POSITIVE_TOLERANCE,
         .descriptor.negative_tolerance = SENSOR_NEGATIVE_TOLERANCE,
         .descriptor.sampling_function = SENSOR_SAMPLE_FUNCTION,
         .descriptor.measure_period = SENSOR_MEASURE_PERIOD,
         .descriptor.update_interval = SENSOR_UPDATE_INTERVAL,
         .sensor_data.format = ESP_BLE_MESH_SENSOR_DATA_FORMAT_A,
-        .sensor_data.length = 0x03, /* 0 represents the length is 1 */
+        .sensor_data.length = 0x03,
         .sensor_data.raw_value = &temperatureSensorData,
     },
     {
@@ -48,7 +32,7 @@ static esp_ble_mesh_sensor_state_t nodeSensorStates[] =
         .descriptor.measure_period = SENSOR_MEASURE_PERIOD,
         .descriptor.update_interval = SENSOR_UPDATE_INTERVAL,
         .sensor_data.format = ESP_BLE_MESH_SENSOR_DATA_FORMAT_A,
-        .sensor_data.length = 0x03, /* 0 represents the length is 1 */ // NOTE: Edited outside temperature to be more that 255
+        .sensor_data.length = 0x03,
         .sensor_data.raw_value = &humiditySensorData,
     },
     {
@@ -59,7 +43,7 @@ static esp_ble_mesh_sensor_state_t nodeSensorStates[] =
         .descriptor.measure_period = SENSOR_MEASURE_PERIOD,
         .descriptor.update_interval = SENSOR_UPDATE_INTERVAL,
         .sensor_data.format = ESP_BLE_MESH_SENSOR_DATA_FORMAT_A,
-        .sensor_data.length = 0x03, /* 0 represents the length is 1 */
+        .sensor_data.length = 0x03,
         .sensor_data.raw_value = &pressureSensorData,
     },
 };
@@ -150,16 +134,12 @@ void nbiotBleMeshNodeBme280Main(void)
     sensorBme280CreateTaskDataAcq();
 }
 
+// This function is unique based on the sensor
 static void nodeBme280UpdateData(void)
 {
-    static uint8_t timesCalled = 0;
-
-    float temperature;
-    float humidity;
-    float pressure;
-
-    timesCalled++;
-    printf("\r\nTimes called = %d\r\n",timesCalled);
+    static float temperature;
+    static float humidity;
+    static float pressure;
 
     temperature = sensorBme280GetTemperature();
     humidity = sensorBme280GetHumidity();

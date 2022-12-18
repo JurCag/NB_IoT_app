@@ -38,23 +38,21 @@ static void taskDataAcq(void *pvParameters)
 		.delay_msec = delay_msek_CB
 	};
 
-	s32 com_rslt;
-	s32 v_uncomp_pressure_s32;
-	s32 v_uncomp_temperature_s32;
-	s32 v_uncomp_humidity_s32;
+	static s32 com_rslt;
+	static s32 v_uncomp_pressure_s32;
+	static s32 v_uncomp_temperature_s32;
+	static s32 v_uncomp_humidity_s32;
 	
 	sensorBme280Init();
 
 	com_rslt = bme280_init(&bme280);
-
 	com_rslt += bme280_set_oversamp_pressure(BME280_OVERSAMP_16X);
 	com_rslt += bme280_set_oversamp_temperature(BME280_OVERSAMP_2X);
 	com_rslt += bme280_set_oversamp_humidity(BME280_OVERSAMP_1X);
-
 	com_rslt += bme280_set_standby_durn(BME280_STANDBY_TIME_1_MS);
 	com_rslt += bme280_set_filter(BME280_FILTER_COEFF_16);
-
 	com_rslt += bme280_set_power_mode(BME280_NORMAL_MODE);
+
 	if (com_rslt == SUCCESS)
     {
 		while(true) 
@@ -175,18 +173,18 @@ void delay_msek_CB(u32 msek)
 
 float sensorBme280GetTemperature(void)
 {
-	// ESP_LOGI(TAG_BME280, "Temp INT %d, float %.2f", compTemp, (compTemp / 100.0));
+	ESP_LOGI(TAG_BME280, "Temp INT %d, float %.2f", compTemp, (compTemp / 100.0));
 	return (compTemp / 100.0);
 }
 
 float sensorBme280GetHumidity(void)
 {
-	// ESP_LOGI(TAG_BME280, "Humi INT %d, float %.2f", compHumi, (compHumi / 1024.0));
+	ESP_LOGI(TAG_BME280, "Humi INT %d, float %.2f", compHumi, (compHumi / 1024.0));
 	return (compHumi / 1024.0);
 }
 
 float sensorBme280GetPressure(void)
 {
-	// ESP_LOGI(TAG_BME280, "Pres INT %d, float %.2f", compPres, (compPres / 100.0));
+	ESP_LOGI(TAG_BME280, "Pres INT %d, float %.2f", compPres, (compPres / 100.0));
 	return (compPres / 100.0);
 }
