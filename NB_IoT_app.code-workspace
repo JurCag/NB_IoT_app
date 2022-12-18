@@ -25,7 +25,20 @@
 			"freertosconfig.h": "c",
 			"timers.h": "c",
 			"bg96.h": "c",
-			"QUEUE.H": "cpp"
+			"QUEUE.H": "cpp",
+			"ble_mesh_example_init.h": "c",
+			"stdio.h": "c",
+			"nbiot_ble_mesh_server.h": "c",
+			"string_view": "c",
+			"esp_ble_mesh_sensor_model_api.h": "c",
+			"esp_ble_mesh_networking_api.h": "c",
+			"functional": "c",
+			"nbiot_ble_mesh_node_bme280.h": "c",
+			"esp_ble_mesh_common_api.h": "c",
+			"nbiot_bme280.h": "c",
+			"sensor_bme280.h": "c",
+			"string.h": "c",
+			"task.h": "c"
 		}
 	}
 }
