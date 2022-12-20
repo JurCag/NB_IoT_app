@@ -7,20 +7,18 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-#include "esp_ble_mesh_defs.h"
+#include "nbiot_ble_mesh_common.h"
 #include "esp_ble_mesh_common_api.h"
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_provisioning_api.h"
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_sensor_model_api.h"
-#include "ble_mesh_example_init.h"
-#include "bt_mesh_properties.h"
+#include "ble_mesh_init.h"
 
 #include "sensor_bme280.h"
 
 
 #define CID_ESP     0x02E5
-uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN];
 
 #define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE   // 0x000 – Unspecified Positive Sensor Tolerance
 #define SENSOR_NEGATIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_NEG_TOLERANCE   // 0x000 – Unspecified Positive Sensor Tolerance

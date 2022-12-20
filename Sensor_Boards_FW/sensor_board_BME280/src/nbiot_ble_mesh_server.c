@@ -1,7 +1,5 @@
 #include "nbiot_ble_mesh_server.h"
 
-uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN] = { 0x32, 0x10 };
-
 /* LOCAL FUNCTIONS DECLARATION */
 static esp_err_t bleMeshServerInit(void);
 
@@ -315,10 +313,12 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
 
     if (param->value.get.sensor_descriptor.op_en == false) // Indicates Property ID not included
     {
-        // Mesh Model Spec:
-        // Ked pride Sensor Descriptor Get message a neni specifikovana Propery ID,
-        // tak treba odpovedat so Sensor Descriptor Status message, ktora obsahuje
-        // Sensor Descriptor pre kazdy senzor ktory je v ramci Senzor serveru
+        /* Mesh Model Spec:
+         * Upon receiving a Sensor Descriptor Get message with the Property ID field
+         * omitted, the Sensor Server shall respond with a Sensor Descriptor Status
+         * message containing the Sensor Descriptor states for all sensors within the
+         * Sensor Server.
+         */
         for (i = 0; i < numOfSensorStates; i++) 
         {
             descriptor.sensorPropId     = sensorStates[i].sensor_property_id;
@@ -353,7 +353,7 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
      * When a Sensor Descriptor Get message that identifies a sensor descriptor
      * property that does not exist on the element, the Descriptor field shall
      * contain the requested Property ID value and the other fields of the Sensor
-     * Descriptor state shall be omitted. Tj ked property ID je neznama
+     * Descriptor state shall be omitted. (Property ID is unknown)
      */
     memcpy(status, &param->value.get.sensor_descriptor.property_id, ESP_BLE_MESH_SENSOR_PROPERTY_ID_LEN);
     length = ESP_BLE_MESH_SENSOR_PROPERTY_ID_LEN;

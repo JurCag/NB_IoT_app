@@ -38,7 +38,10 @@
 			"nbiot_bme280.h": "c",
 			"sensor_bme280.h": "c",
 			"string.h": "c",
-			"task.h": "c"
+			"task.h": "c",
+			"bt_mesh_properties.h": "c",
+			"esp_ble_mesh_provisioning_api.h": "c",
+			"nbiot_ble_mesh_common.h": "c"
 		}
 	}
 }
