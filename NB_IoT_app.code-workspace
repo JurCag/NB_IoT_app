@@ -41,7 +41,19 @@
 			"task.h": "c",
 			"bt_mesh_properties.h": "c",
 			"esp_ble_mesh_provisioning_api.h": "c",
-			"nbiot_ble_mesh_common.h": "c"
+			"nbiot_ble_mesh_common.h": "c",
+			"nbiot_ble_mesh_provisioner_client.h": "c",
+			"sdkconfig.h": "c",
+			"rmt.h": "c",
+			"cmath": "cpp",
+			"limits": "cpp",
+			"type_traits": "cpp",
+			"esp_ble_mesh_config_model_api.h": "c",
+			"array": "c",
+			"string": "c",
+			"soc.h": "c",
+			"atomic": "c",
+			"cstdint": "c"
 		}
 	}
 }

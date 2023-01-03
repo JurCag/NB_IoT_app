@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <freertos/FreeRTOS.h>
 #include <esp_log.h>
+#include "utils.h"
 #include "board.h"
 #include "AT_cmds.h"
 #include "uart.h"
@@ -24,8 +25,6 @@
 #define UART_ESPxPC                 (UART_NUM_0)
 #define UART_ESPxBG96               (UART_NUM_2)
 
-#define MS_TO_TICKS(ms)             (ms/portTICK_PERIOD_MS)
-#define TASK_DELAY_MS(ms)           (vTaskDelay(MS_TO_TICKS(ms)))
 #define NOTIF_MASK(taskIdBit)       (1 << taskIdBit)
 
 #define BG96_HOLD_POWER_UP_PIN_MS   (750) 
@@ -74,6 +73,7 @@ void BG96_txStr(char* str);
 void BG96_txBytes(char* bytes, uint8_t len);
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
+void BG96_sendMqttData(SensorData_t data);
 
 /* FreeRTOS */
 void createTaskRx(void);
@@ -84,7 +84,6 @@ void createTaskForwardSensorData(void);
 
 void createRxDataQueue(void);
 void createAtPacketsTxQueue(void);
-void createSensorDataQueue(void);
 
 void dumpInterComm(char* str);
 void dumpInfo(char* str);

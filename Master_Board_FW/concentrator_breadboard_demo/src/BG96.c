@@ -16,7 +16,6 @@ QueueHandle_t rxDataQueue = NULL;
 static BG96_AtPacket_t deqdAtPacket;
 static char lastSentAtCmdStr[BUFFER_SIZE];
 static QueueHandle_t atPacketsTxQueue = NULL;
-static QueueHandle_t sensorDataQueue = NULL;
 static TaskHandle_t taskRxHandle = NULL;
 static TaskHandle_t taskTxHandle = NULL;
 static TaskHandle_t taskPowerUpModemHandle = NULL;
@@ -38,7 +37,6 @@ static void BG96_buildAtCmdStr(BG96_AtPacket_t* atPacket, char* atCmdStr, const 
 static void powerUpModem(gpio_num_t pwrKeypin);
 static void swPowerDownModem(void);
 static void queueRxData(RxData_t rxData);
-static void queueSensorData(SensorData_t sensorData);
 
 static uint8_t responseParser(void);
 static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
@@ -164,11 +162,6 @@ void createRxDataQueue(void)
 void createAtPacketsTxQueue(void)
 {
     atPacketsTxQueue = xQueueCreate(10, sizeof(BG96_AtPacket_t));
-}
-
-void createSensorDataQueue(void)
-{
-    sensorDataQueue = xQueueCreate(10, sizeof(SensorData_t));
 }
 
 /* FreeRTOS tasks */
@@ -301,12 +294,14 @@ static void taskFeedTxQueue(void* pvParameters)
                 BG96_mqttConnToServer();
 
                 BG96_mqttCreatePayloadDataQueue();
+
+                // TODO: Remove this part (just for testing)
                 memset(sensorData.b, '\0', sizeof(sensorData.b));
                 memcpy(sensorData.b, payload1, strlen(payload1));
                 BG96_mqttQueuePayloadData(sensorData);
                 BG96_mqttPubQueuedData();
 
-                createTaskForwardSensorData();
+                // createTaskForwardSensorData();
                 taskState = SENDING_SENSOR_DATA;
                 
                 break;
@@ -542,7 +537,7 @@ void taskForwardSensorData(void* pvParameters)
     static int readLen;
     static SensorData_t sensorData;
 
-    
+    // TODO: Delete these
     for (uint8_t i = 0; i < 3; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
@@ -567,17 +562,19 @@ void taskForwardSensorData(void* pvParameters)
     }
 }
 
-static void queueSensorData(SensorData_t sensorData)
+// TODO: create function like this:
+// It will be filling the queuePayloadData and on the backgorund there should
+// be som task that sends the data from the queue to the AWS cloud
+// it is already in taskFeedTxQueue in "case SENDING_SENSOR_DATA:"
+void BG96_sendMqttData(SensorData_t data)
 {
-    if (sensorDataQueue != NULL)
+    if (taskFeedTxQueueHandle != NULL)
     {
-        if(xQueueSend(sensorDataQueue, sensorData.b, 100) == errQUEUE_FULL)
-        {
-            dumpInfo("Sensor Data Queue: [FULL]\r\n");
-        }
+        BG96_mqttQueuePayloadData(data);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
     }
     else
-        dumpInfo("Sensor Data Queue: [NOT CREATED]\r\n");
+        dumpInfo("Can't notify non-existing task!\r\n");
 }
 
 void dumpInterComm(char* str)

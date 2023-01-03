@@ -137,6 +137,7 @@ void nbiotBleMeshNodeBme280Main(void)
 // This function is unique based on the sensor
 static void nodeBme280UpdateData(void)
 {
+    static const char* tag = "BME280";
     static float temperature;
     static float humidity;
     static float pressure;
@@ -149,15 +150,15 @@ static void nodeBme280UpdateData(void)
     // otherwise it causes unpredictable behaviour.
     net_buf_simple_reset(&temperatureSensorData);
     net_buf_simple_push_le32(&temperatureSensorData, *(uint32_t*)(&temperature));
-	printf("Temp INTFromFloat %d\r\n", *(uint32_t*)(&temperature));
+    ESP_LOGI(tag, "Temperature uint32_t from float: %d)", *(uint32_t*)(&temperature));
 
     net_buf_simple_reset(&humiditySensorData);
     net_buf_simple_push_le32(&humiditySensorData, *(uint32_t*)(&humidity));
-	printf("Humi INTFromFloat %d\r\n", *(uint32_t*)(&humidity));
+    ESP_LOGI(tag, "Humidity uint32_t from float: %d)", *(uint32_t*)(&humidity));
 
     net_buf_simple_reset(&pressureSensorData);
     net_buf_simple_push_le32(&pressureSensorData, *(uint32_t*)(&pressure));
-	printf("Pres INTFromFloat %d\r\n", *(uint32_t*)(&pressure));
+    ESP_LOGI(tag, "Pressure uint32_t from float: %d)", *(uint32_t*)(&pressure));
 }
 
 

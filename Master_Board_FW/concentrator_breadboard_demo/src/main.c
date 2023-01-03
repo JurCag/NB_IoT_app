@@ -1,7 +1,9 @@
 #include "main.h"
 
-void app_main() {
-
+void app_main() 
+{
+    /* IO */
+    // TODO: move this into board.c, create fcn initIO()
     gpio_reset_pin(PWRKEY_PIN);
     gpio_set_direction(PWRKEY_PIN, GPIO_MODE_OUTPUT);
     gpio_set_level(PWRKEY_PIN, 0);
@@ -20,12 +22,17 @@ void app_main() {
     sprintf(str, "\r\nConfig FreeRTOS freq = %d Hz\r\n", CONFIG_FREERTOS_HZ);
     UART_writeStr(UART_PC, str);
 
+    /* BLE Mesh */
+    esp_log_level_set("*", ESP_LOG_WARN);
+    nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
+    nbiotBleMeshAppMain();
+    nbiotCreateTaskSensorDataGathering();
+
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {
         /* Initialize FreeRTOS components */
         createRxDataQueue();
         createAtPacketsTxQueue();
-        createSensorDataQueue();
 
         TASK_DELAY_MS(1000);
 
