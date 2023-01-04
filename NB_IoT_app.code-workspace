@@ -6,6 +6,10 @@
 		{
 			"name": "sensor_board_BME280",
 			"path": "Sensor_Boards_FW/sensor_board_BME280"
+		},
+		{
+			"name": "concentrator_pcb_rev_1_0",
+			"path": "Master_Board_FW/concentrator_pcb_rev_1_0"
 		}
 	],
 	"settings": {
@@ -53,7 +57,8 @@
 			"string": "c",
 			"soc.h": "c",
 			"atomic": "c",
-			"cstdint": "c"
+			"cstdint": "c",
+			"esp_ble_mesh_defs.h": "c"
 		}
 	}
 }
