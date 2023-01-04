@@ -45,13 +45,15 @@ typedef struct
     NbiotBLEMeshProperties_t propIDs[10];
     uint8_t propIDsCnt;
     esp_ble_mesh_octet16_t uuid;
+    uint8_t timeoutCnt;
 } NbiotBleMeshNode_t;
 
-// typedef struct 
-// {
-//     NbiotBleMeshNode_t sensorNodes[10];
-//     uint8_t nodesCnt;
-// }NbiotBleMesh_t;
+#define MAX_SENSOR_NODES (10)
+typedef struct 
+{
+    NbiotBleMeshNode_t sensorNodes[MAX_SENSOR_NODES];
+    uint8_t nodesCnt;
+}NbiotBleMesh_t;
 
 void nbiotBleMeshAppMain(void);
 void nbiotReceivedSensorDataRegisterCB(nbiotReceivedSensorData_t ptrToFcn);

@@ -23,7 +23,7 @@ void app_main()
     UART_writeStr(UART_PC, str);
 
     /* BLE Mesh */
-    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set("*", ESP_LOG_INFO);
     nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
     nbiotBleMeshAppMain();
     nbiotCreateTaskSensorDataGathering();

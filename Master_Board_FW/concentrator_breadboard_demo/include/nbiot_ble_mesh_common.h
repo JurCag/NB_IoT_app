@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "esp_ble_mesh_defs.h"
 
-
+// Init first 2 octets of dev uuid so client can match it's servers 
 uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN];
 
 typedef enum

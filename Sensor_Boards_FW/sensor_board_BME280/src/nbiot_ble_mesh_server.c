@@ -77,7 +77,7 @@ void nbiotBleMeshServerMain(void)
     err = bluetooth_init();
     if (err) 
     {
-        ESP_LOGE(tag, "esp32_bluetooth_init failed (err %d)", err);
+        ESP_LOGE(tag, "esp32_bluetooth_init failed (err [%d])", err);
         return;
     }
 
@@ -87,7 +87,7 @@ void nbiotBleMeshServerMain(void)
     err = bleMeshServerInit();
     if (err) 
     {
-        ESP_LOGE(tag, "Bluetooth mesh init failed (err %d)", err);
+        ESP_LOGE(tag, "Bluetooth mesh init failed (err [%d])", err);
     }
 }
 
@@ -142,19 +142,19 @@ static void srvProvisioningCB(esp_ble_mesh_prov_cb_event_t event,
     switch (event) 
     {
     case ESP_BLE_MESH_PROV_REGISTER_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROV_REGISTER_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROV_REGISTER_COMP_EVT, err_code [%d]", 
                 param->prov_register_comp.err_code);
         break;
     case ESP_BLE_MESH_NODE_PROV_ENABLE_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_ENABLE_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_ENABLE_COMP_EVT, err_code [%d]", 
                 param->node_prov_enable_comp.err_code);
         break;
     case ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT, bearer %s",
+        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT, bearer [%s]",
                 param->node_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
         break;
     case ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT, bearer %s",
+        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT, bearer [%s]",
                 param->node_prov_link_close.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
         break;
     case ESP_BLE_MESH_NODE_PROV_COMPLETE_EVT:
@@ -166,11 +166,11 @@ static void srvProvisioningCB(esp_ble_mesh_prov_cb_event_t event,
         ESP_LOGI(tag, "ESP_BLE_MESH_NODE_PROV_RESET_EVT");
         break;
     case ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT, err_code %d",
+        ESP_LOGI(tag, "ESP_BLE_MESH_NODE_SET_UNPROV_DEV_NAME_COMP_EVT, err_code [%d]",
                 param->node_set_unprov_dev_name_comp.err_code);
         break;
     default:
-        ESP_LOGE(tag, "Provisioning event: %d not implemented", event);
+        ESP_LOGE(tag, "Provisioning event: [%d] not implemented", event);
         break;
     }
 }
@@ -178,8 +178,8 @@ static void srvProvisioningCB(esp_ble_mesh_prov_cb_event_t event,
 static void srvProvComplete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32_t iv_index)
 {
     static const char* tag = __func__;
-    ESP_LOGI(tag, "net_idx 0x%03x, addr 0x%04x", net_idx, addr);
-    ESP_LOGI(tag, "flags 0x%02x, iv_index 0x%08x", flags, iv_index);
+    ESP_LOGI(tag, "net_idx [0x%03x], addr [0x%04x]", net_idx, addr);
+    ESP_LOGI(tag, "flags [0x%02x], iv_index [0x%08x]", flags, iv_index);
 }
 
 static void configServerCB(esp_ble_mesh_cfg_server_cb_event_t event,
@@ -192,14 +192,14 @@ static void configServerCB(esp_ble_mesh_cfg_server_cb_event_t event,
         {
         case ESP_BLE_MESH_MODEL_OP_APP_KEY_ADD:
             ESP_LOGI(tag, "ESP_BLE_MESH_MODEL_OP_APP_KEY_ADD");
-            ESP_LOGI(tag, "net_idx 0x%04x, app_idx 0x%04x",
+            ESP_LOGI(tag, "net_idx [0x%04x], app_idx [0x%04x]",
                     param->value.state_change.appkey_add.net_idx,
                     param->value.state_change.appkey_add.app_idx);
             ESP_LOG_BUFFER_HEX("AppKey", param->value.state_change.appkey_add.app_key, 16);
             break;
         case ESP_BLE_MESH_MODEL_OP_MODEL_APP_BIND:
             ESP_LOGI(tag, "ESP_BLE_MESH_MODEL_OP_MODEL_APP_BIND");
-            ESP_LOGI(tag, "elem_addr 0x%04x, app_idx 0x%04x, cid 0x%04x, mod_id 0x%04x",
+            ESP_LOGI(tag, "elem_addr [0x%04x], app_idx [0x%04x], cid [0x%04x], mod_id [0x%04x]",
                     param->value.state_change.mod_app_bind.element_addr,
                     param->value.state_change.mod_app_bind.app_idx,
                     param->value.state_change.mod_app_bind.company_id,
@@ -207,7 +207,7 @@ static void configServerCB(esp_ble_mesh_cfg_server_cb_event_t event,
             break;
         case ESP_BLE_MESH_MODEL_OP_MODEL_SUB_ADD:
             ESP_LOGI(tag, "ESP_BLE_MESH_MODEL_OP_MODEL_SUB_ADD");
-            ESP_LOGI(tag, "elem_addr 0x%04x, sub_addr 0x%04x, cid 0x%04x, mod_id 0x%04x",
+            ESP_LOGI(tag, "elem_addr [0x%04x], sub_addr [0x%04x], cid [0x%04x], mod_id [0x%04x]",
                     param->value.state_change.mod_sub_add.element_addr,
                     param->value.state_change.mod_sub_add.sub_addr,
                     param->value.state_change.mod_sub_add.company_id,
@@ -224,7 +224,7 @@ static void sensorServerCB(esp_ble_mesh_sensor_server_cb_event_t event,
 {
     static const char* tag = __func__;
 
-    ESP_LOGI(tag, "Sensor server, event %d, src 0x%04x, dst 0x%04x, model_id 0x%04x",
+    ESP_LOGI(tag, "Sensor server, event [%d], src [0x%04x], dst [0x%04x], model_id [0x%04x]",
             event, param->ctx.addr, param->ctx.recv_dst, param->model->model_id);
 
     switch (event) 
@@ -261,7 +261,7 @@ static void sensorServerCB(esp_ble_mesh_sensor_server_cb_event_t event,
             sendSensorServerSeriesStatus(param);
             break;
         default:
-            ESP_LOGE(tag, "Unknown Sensor Get opcode 0x%04x", param->ctx.recv_op);
+            ESP_LOGE(tag, "Unknown Sensor Get opcode [0x%04x]", param->ctx.recv_op);
             return;
         }
         break;
@@ -283,12 +283,12 @@ static void sensorServerCB(esp_ble_mesh_sensor_server_cb_event_t event,
             ESP_LOGI(tag, "ESP_BLE_MESH_MODEL_OP_SENSOR_SETTING_SET_UNACK");
             break;
         default:
-            ESP_LOGE(tag, "Unknown Sensor Set opcode 0x%04x", param->ctx.recv_op);
+            ESP_LOGE(tag, "Unknown Sensor Set opcode [0x%04x]", param->ctx.recv_op);
             break;
         }
         break;
     default:
-        ESP_LOGE(tag, "Unknown Sensor Server event %d", event);
+        ESP_LOGE(tag, "Unknown Sensor Server event [%d]", event);
         break;
     }
 }                            
@@ -580,7 +580,7 @@ static uint16_t getSensorServerData(esp_ble_mesh_sensor_state_t *state, uint8_t 
 
     if (state == NULL || data == NULL)
     {
-        ESP_LOGE(tag, "%s, Invalid parameter", __func__);
+        ESP_LOGE(tag, "[%s], Invalid parameter", __func__);
         return 0;
     }
 

@@ -20,7 +20,7 @@ static void recvUnprovAdvPkt(uint8_t dev_uuid[ESP_BLE_MESH_OCTET16_LEN], uint8_t
                             esp_ble_mesh_addr_type_t addr_type, uint16_t oob_info,
                             uint8_t adv_type, esp_ble_mesh_prov_bearer_t bearer);
 static esp_err_t nodeProvComplete(uint16_t node_index, const esp_ble_mesh_octet16_t uuid,
-                                uint16_t primary_addr, uint8_t element_num, uint16_t net_idx);
+                                uint16_t unicast_addr, uint8_t element_num, uint16_t net_idx);
 static void setCommonClientParams(esp_ble_mesh_client_common_param_t *common,
                         esp_ble_mesh_node_t *node, esp_ble_mesh_model_t *model, 
                         uint32_t opcode);
@@ -28,8 +28,8 @@ static void setCommonClientParams(esp_ble_mesh_client_common_param_t *common,
 static void nodeCompositionDataParser(const uint8_t *data, uint16_t length);
 static void sensorDescriptorParser(uint8_t *data, uint16_t length, uint16_t unicastAddr);
 
-#define MAX_TIMEOUT_RESEND_ATTEMPTS (4)
-static void serverResponseTimeout(uint32_t opcode, uint16_t unicastAddr);
+#define MAX_TIMEOUT_RESEND_ATTEMPTS (3)
+static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, esp_ble_mesh_octet16_t* resendToNodeUuidAddr);
 static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode); // , NbiotBLEMeshProperties_t propId
 
 TimerHandle_t newNodeProvTimer = NULL;
@@ -40,30 +40,26 @@ static void provisionerStillBusyResetTimer(void);
 static uint8_t isProvisionerReady(void);
 static void newNodeProvTimerCB(TimerHandle_t xTimer);
 
-// Keep track of responses to sent msgs
-static uint8_t respAwaiting = 0;
-static void responseAwaiting(void);
-static void responseReceived(void);
-static uint8_t isResponseAwaiting(void);
-
 static NbiotBleMeshNode_t newNode;
 
-// Keep track of provisioned nodes
-#define MAX_SENSOR_NODES (10)
-static NbiotBleMeshNode_t sensorNodes[MAX_SENSOR_NODES];
-static uint8_t sensorNodesCnt = 0;
+// Track provisioned nodes
+// static NbiotBleMeshNode_t nbiotBleMesh.sensorNodes[MAX_SENSOR_NODES];
+// static uint8_t nbiotBleMesh.nodesCnt = 0;
+static NbiotBleMesh_t nbiotBleMesh;
 static uint8_t insertNode(NbiotBleMeshNode_t* node);
 static void deleteNode(uint8_t btMacAddr[BD_ADDR_LEN]);
 static uint8_t getNodeByAddr(uint16_t addr, NbiotBleMeshNode_t** retNode);
 static uint8_t getNodeByBtMacAddr(uint8_t btMacAddr[BD_ADDR_LEN], NbiotBleMeshNode_t** retNode);
+static uint8_t getNodeTimeoutCnt(uint16_t addr, uint8_t* cnt);
+static uint8_t incrementNodeTimeoutCnt(uint16_t addr);
+static uint8_t resetNodeTimeoutCnt(uint16_t addr);
 
+// Track the node being provisioned
+static esp_ble_mesh_octet16_t nodeBeingProvUuidAddr;
+static void saveNodeBeingProvUuidAddr(esp_ble_mesh_octet16_t uuidAddr);
+static esp_ble_mesh_octet16_t* getNodeBeingProvUuidAddr(void);
 
-// Keep track of the node that is being provisioned
-static uint16_t nodeBeingProvAddr = ESP_BLE_MESH_ADDR_UNASSIGNED;
-static void saveNodeBeingProvAddr(uint16_t nodeAddr);
-static uint16_t getNodeBeingProvAddr(void);
-
-// Keep track of the node that is being serviced
+// Track the node being serviced
 static uint16_t nodeBeingServAddr = ESP_BLE_MESH_ADDR_UNASSIGNED;
 static void saveNodeBeingServAddr(uint16_t nodeAddr);
 static uint16_t getNodeBeingServAddr(void);
@@ -143,7 +139,7 @@ void nbiotBleMeshAppMain(void)
 
     err = bluetooth_init();
     if (err != ESP_OK) {
-        ESP_LOGE(tag, "esp32_bluetooth_init failed (err %d)", err);
+        ESP_LOGE(tag, "esp32_bluetooth_init failed (err [%d])", err);
         return;
     }
 
@@ -153,7 +149,7 @@ void nbiotBleMeshAppMain(void)
     /* Initialize the Bluetooth Mesh Subsystem */
     err = bleMeshInitClient();
     if (err != ESP_OK) {
-        ESP_LOGE(tag, "Bluetooth mesh init failed (err %d)", err);
+        ESP_LOGE(tag, "Bluetooth mesh init failed (err [%d])", err);
     }
 
 }
@@ -161,8 +157,10 @@ void nbiotBleMeshAppMain(void)
 static esp_err_t bleMeshInitClient(void)
 {
     static const char* tag = __func__;
-    uint8_t match[2] = { 0x32, 0x10 };
+    uint8_t match[2];
     esp_err_t err = ESP_OK;
+
+    memcpy(&match, devUUID, sizeof(match));
 
     /* Initlialize provision key parameters */
     provKey.net_idx = ESP_BLE_MESH_KEY_PRIMARY;
@@ -211,19 +209,26 @@ static void provProvisioningCB(esp_ble_mesh_prov_cb_event_t event, esp_ble_mesh_
     switch (event)
     {
     case ESP_BLE_MESH_PROV_REGISTER_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROV_REGISTER_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROV_REGISTER_COMP_EVT, err_code [%d]", 
                 param->prov_register_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_ENABLE_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_ENABLE_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_ENABLE_COMP_EVT, err_code [%d]", 
                 param->provisioner_prov_enable_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_DISABLE_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_DISABLE_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_DISABLE_COMP_EVT, err_code [%d]", 
                 param->provisioner_prov_disable_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_RECV_UNPROV_ADV_PKT_EVT:
         ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_RECV_UNPROV_ADV_PKT_EVT");
+        NbiotBleMeshNode_t* trackedNode;
+        if (getNodeByBtMacAddr(param->provisioner_recv_unprov_adv_pkt.addr, &trackedNode) == EXIT_SUCCESS)
+        {   
+            printf("Device needs to be deleted from tracked nodes first.\r\n");
+            break;
+        }
+
         if (isProvisionerReady())
         {
             provisionerBusyStartTimer();
@@ -240,44 +245,45 @@ static void provProvisioningCB(esp_ble_mesh_prov_cb_event_t event, esp_ble_mesh_
         }
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT, bearer %s",
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT, bearer [%s]",
                  param->provisioner_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT, bearer %s, reason 0x%02x",
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT, bearer [%s], reason [0x%02x]",
                  param->provisioner_prov_link_close.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT", 
                  param->provisioner_prov_link_close.reason);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_COMPLETE_EVT:
         nodeProvComplete(param->provisioner_prov_complete.node_idx, 
-                          param->provisioner_prov_complete.device_uuid,
-                          param->provisioner_prov_complete.unicast_addr, 
-                          param->provisioner_prov_complete.element_num,
-                          param->provisioner_prov_complete.netkey_idx);
+                         param->provisioner_prov_complete.device_uuid,
+                         param->provisioner_prov_complete.unicast_addr, 
+                         param->provisioner_prov_complete.element_num,
+                         param->provisioner_prov_complete.netkey_idx);
         break;
     case ESP_BLE_MESH_PROVISIONER_ADD_UNPROV_DEV_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_ADD_UNPROV_DEV_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_ADD_UNPROV_DEV_COMP_EVT, err_code [%d]", 
                 param->provisioner_add_unprov_dev_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_SET_DEV_UUID_MATCH_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_SET_DEV_UUID_MATCH_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_SET_DEV_UUID_MATCH_COMP_EVT, err_code [%d]", 
                 param->provisioner_set_dev_uuid_match_comp.err_code);                                   
         break;
     case ESP_BLE_MESH_PROVISIONER_SET_NODE_NAME_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_SET_NODE_NAME_COMP_EVT, err_code %d",
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_SET_NODE_NAME_COMP_EVT, err_code [%d]",
                 param->provisioner_set_node_name_comp.err_code);
         if (param->provisioner_set_node_name_comp.err_code == 0)
         {
+            // NOTE: Asking for name works only on name that was set by provisioner
             const char *name = esp_ble_mesh_provisioner_get_node_name(param->provisioner_set_node_name_comp.node_index);
             if (name)
             {
                 // Node index 0 name NODE-00
-                ESP_LOGI(tag, "Node (index): %d, Name: %s", param->provisioner_set_node_name_comp.node_index, name);
+                ESP_LOGI(tag, "Node (index): [%d], Name: [%s]", param->provisioner_set_node_name_comp.node_index, name);
             }
         }
         break;
     case ESP_BLE_MESH_PROVISIONER_ADD_LOCAL_APP_KEY_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_ADD_LOCAL_APP_KEY_COMP_EVT, err_code %d",
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_ADD_LOCAL_APP_KEY_COMP_EVT, err_code [%d]",
                  param->provisioner_add_app_key_comp.err_code);
         if (param->provisioner_add_app_key_comp.err_code == 0)
         {
@@ -291,19 +297,19 @@ static void provProvisioningCB(esp_ble_mesh_prov_cb_event_t event, esp_ble_mesh_
         }
         break;
     case ESP_BLE_MESH_PROVISIONER_BIND_APP_KEY_TO_MODEL_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_BIND_APP_KEY_TO_MODEL_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_BIND_APP_KEY_TO_MODEL_COMP_EVT, err_code [%d]", 
                 param->provisioner_bind_app_key_to_model_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_STORE_NODE_COMP_DATA_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_STORE_NODE_COMP_DATA_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_STORE_NODE_COMP_DATA_COMP_EVT, err_code [%d]", 
                 param->provisioner_store_node_comp_data_comp.err_code);
         break;
     case ESP_BLE_MESH_PROVISIONER_DELETE_DEV_COMP_EVT:
-        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_DELETE_DEV_COMP_EVT, err_code %d", 
+        ESP_LOGI(tag, "ESP_BLE_MESH_PROVISIONER_DELETE_DEV_COMP_EVT, err_code [%d]", 
                 param->provisioner_store_node_comp_data_comp.err_code);
         break;
     default:
-        ESP_LOGI(tag, "EVENT NUMBER: %d NOT IMPLEMENTED", event);
+        ESP_LOGI(tag, "EVENT NUMBER: [%d] NOT IMPLEMENTED", event);
         break;
     }
 }
@@ -319,14 +325,17 @@ static void recvUnprovAdvPkt(uint8_t dev_uuid[ESP_BLE_MESH_OCTET16_LEN],
     esp_ble_mesh_unprov_dev_add_t add_dev = {0};
     esp_err_t err = ESP_OK;
 
+    // Save Node unicast address
+    saveNodeBeingProvUuidAddr(dev_uuid);
+
     /* Due to the API esp_ble_mesh_provisioner_set_dev_uuid_match, Provisioner will only
      * use this callback to report the devices, whose device UUID starts with specified UUID,
      * to the application layer.
      */
     ESP_LOG_BUFFER_HEX("Provisioned Node Bluetooth MAC Address", addr, BD_ADDR_LEN);
-    ESP_LOGI(tag, "Address type 0x%02x, adv type 0x%02x", addr_type, adv_type);
+    ESP_LOGI(tag, "Address type [0x%02x], adv type [0x%02x]", addr_type, adv_type);
     ESP_LOG_BUFFER_HEX("Device UUID", dev_uuid, ESP_BLE_MESH_OCTET16_LEN);
-    ESP_LOGI(tag, "OOB (Out Of Band = not using bluetooth) info 0x%04x, bearer %s", oob_info, (bearer & ESP_BLE_MESH_PROV_ADV) ? "PB-ADV" : "PB-GATT");
+    ESP_LOGI(tag, "OOB (Out Of Band = not using bluetooth) info [0x%04x], bearer [%s]", oob_info, (bearer & ESP_BLE_MESH_PROV_ADV) ? "PB-ADV" : "PB-GATT");
 
     memcpy(add_dev.addr, addr, BD_ADDR_LEN);
     add_dev.addr_type = (uint8_t)addr_type;
@@ -334,8 +343,8 @@ static void recvUnprovAdvPkt(uint8_t dev_uuid[ESP_BLE_MESH_OCTET16_LEN],
     add_dev.oob_info = oob_info;
     add_dev.bearer = (uint8_t)bearer;
 
-    /* Note: If unprovisioned device adv packets have not been received, we should not add
-             device with ADD_DEV_START_PROV_NOW_FLAG set. */
+    /* Note: If unprovisioned device adv packets have not been received, do not add
+            device with ADD_DEV_START_PROV_NOW_FLAG set. */
     err = esp_ble_mesh_provisioner_add_unprov_dev(&add_dev,
             ADD_DEV_RM_AFTER_PROV_FLAG | ADD_DEV_START_PROV_NOW_FLAG | ADD_DEV_FLUSHABLE_DEV_FLAG);
     if (err != ESP_OK) {
@@ -345,7 +354,7 @@ static void recvUnprovAdvPkt(uint8_t dev_uuid[ESP_BLE_MESH_OCTET16_LEN],
 
 static esp_err_t nodeProvComplete(uint16_t node_index, 
                                 const esp_ble_mesh_octet16_t uuid,
-                                uint16_t primary_addr, 
+                                uint16_t unicast_addr, 
                                 uint8_t element_num, 
                                 uint16_t net_idx)
 {
@@ -356,14 +365,11 @@ static esp_err_t nodeProvComplete(uint16_t node_index,
     esp_err_t err = ESP_OK;
     static const char* tag = __func__;
 
-    ESP_LOGI(tag, "node_index %u, primary_addr 0x%04x, element_num %u, net_idx 0x%03x",
-        node_index, primary_addr, element_num, net_idx);
+    ESP_LOGI(tag, "node_index [%u], unicast_addr [0x%04x], element_num [%u], net_idx [0x%03x]",
+        node_index, unicast_addr, element_num, net_idx);
     ESP_LOG_BUFFER_HEX("uuid", uuid, ESP_BLE_MESH_OCTET16_LEN);
 
-    // Save Node unicast address
-    saveNodeBeingProvAddr(primary_addr);
-
-    // NOTE: Set node name by provisioner
+    // NOTE: Provisioner gives node a name
     sprintf(srvName, "%s%02x", "NODE-", node_index);
     err = esp_ble_mesh_provisioner_set_node_name(node_index, srvName);
     if (err != ESP_OK) 
@@ -372,20 +378,11 @@ static esp_err_t nodeProvComplete(uint16_t node_index,
         return ESP_FAIL;
     }
 
-    // NOTE: Asking for name
-    // printf("ASKING FOR NAME\n");
-    // const char *name = esp_ble_mesh_provisioner_get_node_name(node_index);
-    // if (name)
-    // {
-    //     // Node 0 name NODE-00
-    //     ESP_LOGI(tag, "Node %d name %s", node_index, name);
-    // }
-
     // Get the node based on unicast address
-    node = esp_ble_mesh_provisioner_get_node_with_addr(getNodeBeingProvAddr());
+    node = esp_ble_mesh_provisioner_get_node_with_addr(unicast_addr);
     if (node == NULL) 
     {
-        ESP_LOGE(tag, "Failed to get node 0x%04x info", getNodeBeingProvAddr());
+        ESP_LOGE(tag, "Failed to get node [0x%04x] info", unicast_addr);
         return ESP_FAIL;
     }
     ESP_LOG_BUFFER_HEX("Returned Node device address", node->addr, BD_ADDR_LEN); // NOTE: remove print later
@@ -402,31 +399,11 @@ static esp_err_t nodeProvComplete(uint16_t node_index,
 
     // Store into local struct (yet missing propIDs)
     memcpy(&(newNode.btMacAddr), node->addr, BD_ADDR_LEN);
-    newNode.srvAddr = getNodeBeingProvAddr();
+    newNode.srvAddr = unicast_addr;
     memcpy(newNode.uuid, uuid, ESP_BLE_MESH_OCTET16_LEN);
+    newNode.timeoutCnt = 0;
 
-    if (insertNode(&newNode) != EXIT_SUCCESS)
-    {
-        // This is the case when device is advertising itself to be provisioned,
-        // before the provisioner deleted it (provisioner is still trying to reach because of timeout)
-        esp_ble_mesh_device_delete_t deleteDevice;
-        NbiotBleMeshNode_t* nodeToDelete;
-
-        if (getNodeByBtMacAddr(newNode.btMacAddr, &nodeToDelete) == EXIT_SUCCESS)
-        {
-            printf("Device needs to be deleted first\r\n");
-            memcpy(&deleteDevice.uuid, nodeToDelete->uuid, sizeof(esp_ble_mesh_octet16_t));
-            deleteDevice.flag = DEL_DEV_UUID_FLAG;
-
-            esp_ble_mesh_provisioner_delete_dev(&deleteDevice);
-            deleteNode(nodeToDelete->btMacAddr);
-            insertNode(&newNode);
-        }
-        else
-            printf("Bluetooth MAC address does not match any stored node.");
-    }
-
-    printf("\r\nStored MAC ADDRESS hex: %x %x %x %x %x %x, Server (Element Unicast) Address: %d\r\n", 
+    printf("\r\nStored MAC ADDRESS hex: [%x %x %x %x %x %x], Server (Element Unicast) Address: [%d]\r\n", 
             newNode.btMacAddr[0],
             newNode.btMacAddr[1],
             newNode.btMacAddr[2],
@@ -435,7 +412,14 @@ static esp_err_t nodeProvComplete(uint16_t node_index,
             newNode.btMacAddr[5],
             newNode.srvAddr);
 
-    printf("Actual node count: %d\r\n", nbiotGetNodesCnt());
+    if (insertNode(&newNode) == EXIT_SUCCESS)
+    {
+        printf("Insert node SUCCESS. Current node count: [%d]\r\n", nbiotGetNodesCnt());
+    }
+    else
+    {
+        ESP_LOGE(tag, "The node must be deleted before provisioning!\r\n"); // should never come here
+    }
 
     return ESP_OK;
 }                               
@@ -466,18 +450,18 @@ static void configClientCB(esp_ble_mesh_cfg_client_cb_event_t event,
     esp_err_t err = ESP_OK;
     static const char* tag = __func__;
 
-    ESP_LOGI(tag, "Config client, event %u, addr 0x%04x, opcode 0x%04x",
+    ESP_LOGI(tag, "Config client, event [%u], addr [0x%04x], opcode [0x%04x]",
         event, param->params->ctx.addr, param->params->opcode);
 
     if (param->error_code) {
-        ESP_LOGE(tag, "Send config client message failed (err %d)", param->error_code);
+        ESP_LOGE(tag, "Send config client message failed (err [%d])", param->error_code);
         return;
     }
 
     // Get the node from common params -> context -> remote address
     node = esp_ble_mesh_provisioner_get_node_with_addr(param->params->ctx.addr);
     if (!node) {
-        ESP_LOGE(tag, "Node 0x%04x not exists", param->params->ctx.addr);
+        ESP_LOGE(tag, "Node [0x%04x] is not among tracked nodes!", param->params->ctx.addr);
         return;
     }
 
@@ -611,7 +595,7 @@ static void configClientCB(esp_ble_mesh_cfg_client_cb_event_t event,
         }
         break;
     default:
-        ESP_LOGE(tag, "Invalid config client event %u", event);
+        ESP_LOGE(tag, "Invalid config client event [%u]", event);
         break;
     }
 }
@@ -633,7 +617,7 @@ static void nodeCompositionDataParser(const uint8_t *data, uint16_t length)
     static const char* tag = __func__;
 
     ESP_LOGI(tag, "*** Composition Data Start ***");
-    ESP_LOGI(tag, "* CID 0x%04x, PID 0x%04x, VID 0x%04x, CRPL 0x%04x, Features 0x%04x *", cid, pid, vid, crpl, feat);
+    ESP_LOGI(tag, "* CID 0x%04x, PID 0x%04x, VID 0x%04x, CRPL 0x%04x, Features[0x%04x]*", cid, pid, vid, crpl, feat);
     for (; offset < length; )
     {
         loc = COMP_DATA_2_OCTET(data, offset);
@@ -649,7 +633,7 @@ static void nodeCompositionDataParser(const uint8_t *data, uint16_t length)
         {
             // SIG Models that provisioned node cantains
             model_id = COMP_DATA_2_OCTET(data, offset);
-            ESP_LOGI(tag, "* SIG Model ID 0x%04x *", model_id);
+            ESP_LOGI(tag, "* SIG Model ID [0x%04x]*", model_id);
             offset += 2;
         }
         for (i = 0; i < numOfVendorModels; i++)
@@ -657,7 +641,7 @@ static void nodeCompositionDataParser(const uint8_t *data, uint16_t length)
             // Vendor Models that provisioned node cantains
             company_id = COMP_DATA_2_OCTET(data, offset);
             model_id = COMP_DATA_2_OCTET(data, offset + 2);
-            ESP_LOGI(tag, "* Vendor Model ID 0x%04x, Company ID 0x%04x *", model_id, company_id);
+            ESP_LOGI(tag, "* Vendor Model ID 0x%04x, Company ID [0x%04x]*", model_id, company_id);
             offset += 4;
         }
     }
@@ -670,24 +654,24 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
     esp_ble_mesh_node_t *node = NULL;
     static const char* tag = __func__;
 
-    // ESP_LOGI(tag, "Sensor client, event %u, addr 0x%04x", event, param->params->ctx.addr);
+    // ESP_LOGI(tag, "Sensor client, event [%u], addr [0x%04x]", event, param->params->ctx.addr);
 
     if (param->error_code) {
-        ESP_LOGE(tag, "Send sensor client message failed (err %d)", param->error_code);
+        ESP_LOGE(tag, "Send sensor client message failed (err [%d])", param->error_code);
         return;
     }
 
     // Get the node from common params -> context -> remote address
     node = esp_ble_mesh_provisioner_get_node_with_addr(param->params->ctx.addr);
     if (!node) {
-        ESP_LOGE(tag, "Node 0x%04x not exists", param->params->ctx.addr);
+        ESP_LOGE(tag, "Node [0x%04x] not exists", param->params->ctx.addr);
         return;
     }
     
     if (event != ESP_BLE_MESH_SENSOR_CLIENT_TIMEOUT_EVT)
     {
         printf("RECEIVED RESPONSE\n");
-        responseReceived();
+        resetNodeTimeoutCnt(node->unicast_addr);
     }
         
 
@@ -701,7 +685,7 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
             if (param->status_cb.descriptor_status.descriptor->len != ESP_BLE_MESH_SENSOR_SETTING_PROPERTY_ID_LEN &&
                 param->status_cb.descriptor_status.descriptor->len % ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN)
             {
-                ESP_LOGE(tag, "Invalid Sensor Descriptor Status length %d", param->status_cb.descriptor_status.descriptor->len);
+                ESP_LOGE(tag, "Invalid Sensor Descriptor Status length [%d]", param->status_cb.descriptor_status.descriptor->len);
                 return;
             }
             if (param->status_cb.descriptor_status.descriptor->len)
@@ -788,7 +772,7 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
         ESP_LOGE(tag, "ESP_BLE_MESH_SENSOR_CLIENT_PUBLISH_EVT not implemented");
         break;
     case ESP_BLE_MESH_SENSOR_CLIENT_TIMEOUT_EVT:
-        serverResponseTimeout(param->params->opcode, node->unicast_addr);
+        serverResponseTimeout(param->params->opcode, node->unicast_addr, &(node->dev_uuid));
         break;
     default:
         ESP_LOGE(tag, "Unknown event");
@@ -812,10 +796,10 @@ static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unic
         propID = data[(SENSOR_DESCRIPTOR_STATE_SIZE * i) + 1] << 8 | data[(SENSOR_DESCRIPTOR_STATE_SIZE * i)];
         nodeToUpdate->propIDs[i] = propID;
         nodeToUpdate->propIDsCnt++;
-        printf("FOUND PROP ID %d: %04x\r\n", i, propID);
+        printf("FOUND PROP ID [%d]: [%04x]\r\n", i, propID);
     }
 
-    printf("\r\nUPDATING PROPERTY IDs of NODE: %x %x %x %x %x %x, Address: %d\r\n", 
+    printf("\r\nUpdating property IDs of node: [%x %x %x %x %x %x], Unicast Addr: [%d]\r\n", 
             nodeToUpdate->btMacAddr[0],
             nodeToUpdate->btMacAddr[1],
             nodeToUpdate->btMacAddr[2],
@@ -826,36 +810,29 @@ static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unic
 
     for (int i = 0; i < nodeToUpdate->propIDsCnt; i++)
     {
-        printf("Prop ID: %04x\r\n", nodeToUpdate->propIDs[i]);
+        printf("Prop ID: [%04x]\r\n", nodeToUpdate->propIDs[i]);
     }
-    // insertNode(&newNode);
-    // printf("Actual node count: %d\r\n", nbiotGetNodesCnt());
-
+    
     memset(&newNode, 0, sizeof(NbiotBleMeshNode_t));
+    printf("Update node SUCCESS. Current node count: [%d]\r\n", nbiotGetNodesCnt());
     provisionerFinishedStopTimer();
 }
 
-static void serverResponseTimeout(uint32_t opcode, uint16_t unicastAddr)
+static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, esp_ble_mesh_octet16_t* resendToNodeUuidAddr)
 {
     static const char* tag = __func__;
-    static uint16_t resendToNodeAddr = 0;
-    static uint16_t prevResendToNodeAddr = 0;
-    static uint8_t resendAttempts = 0;
-    
-    prevResendToNodeAddr = resendToNodeAddr;
-    resendToNodeAddr = unicastAddr;
+    static uint8_t timeoutCnt;
 
-    if ((prevResendToNodeAddr == resendToNodeAddr) && isResponseAwaiting())
+    if (incrementNodeTimeoutCnt(resendToNodeAddr) == EXIT_FAILURE)
     {
-        printf("Timeout resend attempts: [%d]\n", resendAttempts);
-        resendAttempts++;
+        ESP_LOGE(tag, "Node with unicast addr: [%d] is not among tracked nodes!", resendToNodeAddr);
+        return;
     }
-    else
-        resendAttempts = 0;
 
     // If msg was related to provisioning then also reset prov timer
     // NOTE: Because each node in NBIoT app has one element, unicast address is the same as node addr
-    if ((!isProvisionerReady()) && (getNodeBeingProvAddr() == unicastAddr))
+    esp_ble_mesh_octet16_t* provNodeUuid = getNodeBeingProvUuidAddr();
+    if ((!isProvisionerReady()) && (memcmp(resendToNodeUuidAddr, provNodeUuid, sizeof(esp_ble_mesh_octet16_t)) == 0))
         provisionerStillBusyResetTimer();
 
     switch (opcode)
@@ -897,7 +874,12 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t unicastAddr)
     }
 
     // Delete the node when offline
-    if (resendAttempts >= MAX_TIMEOUT_RESEND_ATTEMPTS)
+    if (getNodeTimeoutCnt(resendToNodeAddr, &timeoutCnt) == EXIT_FAILURE)
+    {
+        ESP_LOGE(tag, "Node with unicast addr: [%d] is not among tracked nodes!", resendToNodeAddr);
+        return;
+    }
+    if (timeoutCnt >= MAX_TIMEOUT_RESEND_ATTEMPTS)
     {
         esp_ble_mesh_device_delete_t deleteDevice;
         NbiotBleMeshNode_t* nodeToDelete;
@@ -907,10 +889,9 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t unicastAddr)
             memcpy(&deleteDevice.uuid, nodeToDelete->uuid, sizeof(esp_ble_mesh_octet16_t));
             deleteDevice.flag = DEL_DEV_UUID_FLAG;
 
-            ESP_LOGI(tag, "Deleting OFFLINE node. Unicast address: %d", resendToNodeAddr);
+            ESP_LOGW(tag, "DELETING tracked node with unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
             esp_ble_mesh_provisioner_delete_dev(&deleteDevice);
             deleteNode(nodeToDelete->btMacAddr);
-            resendAttempts = 0;
         }
         else
         {
@@ -919,9 +900,8 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t unicastAddr)
         return;
     }
 
-    ESP_LOGW(tag, "Timeout on Unicast Address: %d", resendToNodeAddr);
+    ESP_LOGW(tag, "Node with unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
     bleMeshSendMsgToServer(resendToNodeAddr, opcode);
-
 }
 
 static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode) // , NbiotBLEMeshProperties_t propId
@@ -934,7 +914,7 @@ static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode) // , Nbiot
 
     node = esp_ble_mesh_provisioner_get_node_with_addr(srvAddr);
     if (node == NULL) {
-        ESP_LOGE(tag, "Node 0x%04x is not in the BLE mesh", srvAddr);
+        ESP_LOGE(tag, "Node [0x%04x] is not in the BLE mesh", srvAddr);
         return;
     }
 
@@ -960,31 +940,11 @@ static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode) // , Nbiot
     //     break;
     // }
 
-    responseAwaiting();
-
     err = esp_ble_mesh_sensor_client_get_state(&common, &get);
     if (err != ESP_OK) {
         ESP_LOGE(tag, "Failed to send sensor message 0x%04x", opcode);
     }
 }
-
-// Keep track of responses to sent msgs
-static void responseAwaiting(void)
-{
-    printf("resp awaiting\n");
-    respAwaiting = 1;
-}
-
-static void responseReceived(void)
-{
-    respAwaiting = 0;
-}
-
-static uint8_t isResponseAwaiting(void)
-{
-    return respAwaiting;
-}
-
 
 // Disable new node provisioning for given period of time, 
 // if the  provisionerFinishedStopTimer won't get called
@@ -1058,34 +1018,34 @@ static void newNodeProvTimerCB(TimerHandle_t xTimer)
     busyProvisioningNewNode = 0;
 }
 
-// Keep track of provisioned nodes
+// Track provisioned nodes
 static uint8_t insertNode(NbiotBleMeshNode_t* node)
 {
-    for (uint8_t i = 0; i < sensorNodesCnt; i++)
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
     {
-        if (memcmp(sensorNodes[i].btMacAddr, node->btMacAddr, BD_ADDR_LEN) == 0)
+        if (memcmp(nbiotBleMesh.sensorNodes[i].btMacAddr, node->btMacAddr, BD_ADDR_LEN) == 0)
         {
             printf("NODE ALREADY INSERTED\r\n");
             return EXIT_FAILURE;
         }
     }
 
-    if (sensorNodesCnt < MAX_SENSOR_NODES)
+    if (nbiotBleMesh.nodesCnt < MAX_SENSOR_NODES)
     {
-        memcpy(&sensorNodes[sensorNodesCnt], node, sizeof(NbiotBleMeshNode_t));
-        sensorNodesCnt++;
+        memcpy(&nbiotBleMesh.sensorNodes[nbiotBleMesh.nodesCnt], node, sizeof(NbiotBleMeshNode_t));
+        nbiotBleMesh.nodesCnt++;
     }
     return EXIT_SUCCESS;
 }
 
 static void deleteNode(uint8_t btMacAddr[BD_ADDR_LEN])
 {
-    for (uint8_t i = 0; i < sensorNodesCnt; i++)
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
     {
-        if (memcmp(sensorNodes[i].btMacAddr, btMacAddr, BD_ADDR_LEN) == 0)
+        if (memcmp(nbiotBleMesh.sensorNodes[i].btMacAddr, btMacAddr, BD_ADDR_LEN) == 0)
         {
-            memmove(&sensorNodes[i], &sensorNodes[i + 1], (sensorNodesCnt - i - 1) * sizeof(NbiotBleMeshNode_t));
-            sensorNodesCnt--;
+            memmove(&nbiotBleMesh.sensorNodes[i], &nbiotBleMesh.sensorNodes[i + 1], (nbiotBleMesh.nodesCnt - i - 1) * sizeof(NbiotBleMeshNode_t));
+            nbiotBleMesh.nodesCnt--;
             return;
         }
     }
@@ -1093,11 +1053,11 @@ static void deleteNode(uint8_t btMacAddr[BD_ADDR_LEN])
 
 static uint8_t getNodeByAddr(uint16_t addr, NbiotBleMeshNode_t** retNode)
 {
-    for (uint8_t i = 0; i < sensorNodesCnt; i++)
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
     {
-        if (sensorNodes[i].srvAddr == addr)
+        if (nbiotBleMesh.sensorNodes[i].srvAddr == addr)
         {
-            *retNode = &sensorNodes[i];
+            *retNode = &nbiotBleMesh.sensorNodes[i];
             return EXIT_SUCCESS;
         }
     }
@@ -1106,11 +1066,11 @@ static uint8_t getNodeByAddr(uint16_t addr, NbiotBleMeshNode_t** retNode)
 
 static uint8_t getNodeByBtMacAddr(uint8_t btMacAddr[BD_ADDR_LEN], NbiotBleMeshNode_t** retNode)
 {
-    for (uint8_t i = 0; i < sensorNodesCnt; i++)
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
     {
-        if (memcmp(sensorNodes[i].btMacAddr, btMacAddr, BD_ADDR_LEN) == 0)
+        if (memcmp(nbiotBleMesh.sensorNodes[i].btMacAddr, btMacAddr, BD_ADDR_LEN) == 0)
         {
-            *retNode = &sensorNodes[i];
+            *retNode = &nbiotBleMesh.sensorNodes[i];
             return EXIT_SUCCESS;
         }
     }
@@ -1119,9 +1079,9 @@ static uint8_t getNodeByBtMacAddr(uint8_t btMacAddr[BD_ADDR_LEN], NbiotBleMeshNo
 
 uint8_t nbiotGetNodeByIdx(uint8_t idx, NbiotBleMeshNode_t** retNode)
 {
-    if (idx < sensorNodesCnt)
+    if (idx < nbiotBleMesh.nodesCnt)
     {
-        *retNode = &sensorNodes[idx];
+        *retNode = &nbiotBleMesh.sensorNodes[idx];
         return EXIT_SUCCESS;
     }
     return EXIT_FAILURE;
@@ -1129,21 +1089,60 @@ uint8_t nbiotGetNodeByIdx(uint8_t idx, NbiotBleMeshNode_t** retNode)
 
 uint8_t nbiotGetNodesCnt(void)
 {
-    return sensorNodesCnt;
+    return nbiotBleMesh.nodesCnt;
 }
 
-// Keep track of the node that is being provisoned
-static void saveNodeBeingProvAddr(uint16_t nodeAddr)
+static uint8_t getNodeTimeoutCnt(uint16_t addr, uint8_t* cnt)
 {
-    nodeBeingProvAddr = nodeAddr;
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
+    {
+        if (nbiotBleMesh.sensorNodes[i].srvAddr == addr)
+        {
+            *cnt = nbiotBleMesh.sensorNodes[i].timeoutCnt;
+            return EXIT_SUCCESS;
+        }
+    }
+    return EXIT_FAILURE;
 }
 
-static uint16_t getNodeBeingProvAddr(void)
+static uint8_t incrementNodeTimeoutCnt(uint16_t addr)
 {
-    return nodeBeingProvAddr;
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
+    {
+        if (nbiotBleMesh.sensorNodes[i].srvAddr == addr)
+        {
+            nbiotBleMesh.sensorNodes[i].timeoutCnt++;
+            return EXIT_SUCCESS;
+        }
+    }
+    return EXIT_FAILURE;
 }
 
-// Keep track of the node that is being serviced
+static uint8_t resetNodeTimeoutCnt(uint16_t addr)
+{
+    for (uint8_t i = 0; i < nbiotBleMesh.nodesCnt; i++)
+    {
+        if (nbiotBleMesh.sensorNodes[i].srvAddr == addr)
+        {
+            nbiotBleMesh.sensorNodes[i].timeoutCnt = 0;
+            return EXIT_SUCCESS;
+        }
+    }
+    return EXIT_FAILURE;
+}
+
+// Track the node that is being provisoned
+static void saveNodeBeingProvUuidAddr(esp_ble_mesh_octet16_t uuidAddr)
+{
+    memcpy(nodeBeingProvUuidAddr, uuidAddr, sizeof(esp_ble_mesh_octet16_t));
+}
+
+static esp_ble_mesh_octet16_t* getNodeBeingProvUuidAddr(void)
+{
+    return (&nodeBeingProvUuidAddr);
+}
+
+// Track the node that is being serviced
 static void saveNodeBeingServAddr(uint16_t nodeAddr)
 {
     nodeBeingServAddr = nodeAddr;
@@ -1174,7 +1173,7 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param)
             uint16_t prop_id = ESP_BLE_MESH_GET_SENSOR_DATA_PROPERTY_ID(data, fmt);            
             uint8_t mpid_len = (fmt == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A ? ESP_BLE_MESH_SENSOR_DATA_FORMAT_A_MPID_LEN : ESP_BLE_MESH_SENSOR_DATA_FORMAT_B_MPID_LEN); // marshalled property id length
 
-            ESP_LOGI(tag, "Format %s, length 0x%02x, Sensor Property ID 0x%04x",
+            ESP_LOGI(tag, "Format [%s], length [0x%02x], Sensor Property ID [0x%04x]",
                         fmt == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A ? "A" : "B", data_len, prop_id);
 
             if (data_len != ESP_BLE_MESH_SENSOR_DATA_ZERO_LEN)

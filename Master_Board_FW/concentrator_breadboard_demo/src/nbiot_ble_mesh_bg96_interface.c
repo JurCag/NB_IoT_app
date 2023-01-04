@@ -39,7 +39,7 @@ static void taskSensorDataGathering(void *pvParameters)
                 }
                 else
                 {
-                    printf("NODE WITH INDEX %d IS NOT ONLINE ANYMORE\n", nodeIdx);
+                    printf("Node with index [%d] not ONLINE anymore!\n", nodeIdx);
                 }                
             }
         }
@@ -63,7 +63,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen)
                 // nbiotReceivedDataFloat(data);
             }
             else
-                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: 0x%04x, expected 3 (4 bytes), actual: %d", propId, dataLen);
+                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected 3 (4 bytes), actual: [%d]", propId, dataLen);
             break;
         case NBIOT_BLE_MESH_PROP_ID_PRESSURE:
             if (dataLen == 0x03)
@@ -75,7 +75,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen)
                 // nbiotReceivedDataFloat(data);
             }
             else
-                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: 0x%04x, expected 3 (4 bytes), actual: %d", propId, dataLen);
+                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected 3 (4 bytes), actual: [%d]", propId, dataLen);
             break;
         case NBIOT_BLE_MESH_PROP_ID_HUMIDITY:
             if (dataLen == 0x03)
@@ -87,11 +87,11 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen)
                 // nbiotReceivedDataFloat(data);
             }
             else
-                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: 0x%04x, expected 3 (4 bytes), actual: %d", propId, dataLen);
+                ESP_LOGW(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected 3 (4 bytes), actual: [%d]", propId, dataLen);
             break;
 
         default:
-            ESP_LOGI(tag, "Sensor PropertyId: 0x%04x is not known/implemented!", propId);
+            ESP_LOGI(tag, "Sensor PropertyId: [0x%04x] is not known/implemented!", propId);
             break;
     }
 }
