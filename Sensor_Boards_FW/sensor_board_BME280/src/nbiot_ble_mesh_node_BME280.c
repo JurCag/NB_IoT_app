@@ -1,5 +1,7 @@
 #include "nbiot_ble_mesh_node_bme280.h"
 
+#define SENSOR_NAME                 ("BME280")
+
 NET_BUF_SIMPLE_DEFINE_STATIC(temperatureSensorData, 1);
 NET_BUF_SIMPLE_DEFINE_STATIC(humiditySensorData, 1);
 NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 1);
@@ -8,6 +10,29 @@ NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 1);
 #define SENSOR_PROPERTY_ID_0        NBIOT_BLE_MESH_PROP_ID_TEMPERATURE
 #define SENSOR_PROPERTY_ID_1        NBIOT_BLE_MESH_PROP_ID_HUMIDITY
 #define SENSOR_PROPERTY_ID_2        NBIOT_BLE_MESH_PROP_ID_PRESSURE
+
+// #define SENSOR_COUNT                (3)
+// char* bme280PropNames[SENSOR_PROP_NAME_MAX_LEN] = {"temperature", "humidity", "pressure"};
+// char* bme280Names[SENSOR_NAME_MAX_LEN] = {SENSOR_NAME, SENSOR_NAME, SENSOR_NAME};
+
+static NbiotSensorSetup_t sensorNbiotSetup[] = 
+{
+    {
+        .name           = SENSOR_NAME,
+        .propName       = "temperature",
+        .propDataType   = NBIOT_FLOAT
+    },
+    {
+        .name           = SENSOR_NAME,
+        .propName       = "humidity",
+        .propDataType   = NBIOT_FLOAT
+    },
+    {
+        .name           = SENSOR_NAME,
+        .propName       = "pressure",
+        .propDataType   = NBIOT_FLOAT
+    }
+};
 
 static void nodeBme280UpdateData(void);
 
@@ -47,8 +72,6 @@ static esp_ble_mesh_sensor_state_t nodeSensorStates[] =
         .sensor_data.raw_value = &pressureSensorData,
     },
 };
-
-
 
 /* BLE MESH MODELS */
 // 1. Configuration Server Model
@@ -123,6 +146,7 @@ void nbiotBleMeshNodeBme280Main(void)
     nbiotBleMeshServerInitSensorStates(nodeSensorStates, ARRAY_SIZE(nodeSensorStates));
     nbiotBleMeshServerInitProvision(&provision);
     nbiotBleMeshServerInitComposition(&composition);
+    nbiotBleMeshServerInitSensorSetup(sensorNbiotSetup, sizeof(sensorNbiotSetup)/sizeof(sensorNbiotSetup[0]));
 
     // Register CallBack which updates the node data from sensor
     nbiotBleMeshRegisterUpdateSensorDataCB(nodeBme280UpdateData);

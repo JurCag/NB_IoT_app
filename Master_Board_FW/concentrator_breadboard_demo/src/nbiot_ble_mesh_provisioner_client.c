@@ -30,7 +30,7 @@ static void sensorDescriptorParser(uint8_t *data, uint16_t length, uint16_t unic
 
 #define MAX_TIMEOUT_RESEND_ATTEMPTS (3)
 static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, esp_ble_mesh_octet16_t* resendToNodeUuidAddr);
-static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode); // , NbiotBLEMeshProperties_t propId
+static void bleMeshSendMsgToServer(uint16_t srvAddr, uint32_t opcode);
 
 TimerHandle_t newNodeProvTimer = NULL;
 static uint8_t busyProvisioningNewNode = 0;
@@ -65,7 +65,7 @@ static void saveNodeBeingServAddr(uint16_t nodeAddr);
 static uint16_t getNodeBeingServAddr(void);
 
 // Sensor Data Parsing
-static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param);
+static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param, uint16_t unicastAddr);
 static nbiotReceivedSensorData_t nbiotReceivedSensorDataCB = NULL;
 
 static uint8_t  dev_uuid[ESP_BLE_MESH_OCTET16_LEN];
@@ -120,7 +120,6 @@ static esp_ble_mesh_prov_t provision =
     .prov_unicast_addr  = PROV_OWN_ADDR,
     .prov_start_address = PROV_START_ADDRESS_OFFSET,
 };
-
 
 
 void nbiotBleMeshAppMain(void)
@@ -683,7 +682,7 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
         case ESP_BLE_MESH_MODEL_OP_SENSOR_DESCRIPTOR_GET:
             ESP_LOGI(tag, "Sensor Descriptor Status, opcode of RECEIVED msg 0x%04x", param->params->ctx.recv_op);
             if (param->status_cb.descriptor_status.descriptor->len != ESP_BLE_MESH_SENSOR_SETTING_PROPERTY_ID_LEN &&
-                param->status_cb.descriptor_status.descriptor->len % ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN)
+                param->status_cb.descriptor_status.descriptor->len % NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE)
             {
                 ESP_LOGE(tag, "Invalid Sensor Descriptor Status length [%d]", param->status_cb.descriptor_status.descriptor->len);
                 return;
@@ -721,9 +720,9 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
                                    param->status_cb.setting_status.sensor_setting_raw->len);
             }
             break;
-        case ESP_BLE_MESH_MODEL_OP_SENSOR_GET: // NOTE: forward sensor data to be parsed
+        case ESP_BLE_MESH_MODEL_OP_SENSOR_GET:
             ESP_LOGI(tag, "Sensor Status, opcode 0x%04x", param->params->ctx.recv_op);
-            sensorDataParser(param);
+            sensorDataParser(param, node->unicast_addr);
             break;
         case ESP_BLE_MESH_MODEL_OP_SENSOR_COLUMN_GET:
             ESP_LOGI(tag, "Sensor Column Status, opcode 0x%04x, Sensor Property ID 0x%04x",
@@ -782,21 +781,33 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
 
 static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unicastAddr)
 {
+    static const char* tag = __func__;
     uint8_t nodePropIDsCnt;
-    uint16_t propID;
     NbiotBleMeshNode_t* nodeToUpdate;
+    nbiotSensorServerDescriptor_t descriptor;
 
-    if (getNodeByAddr(unicastAddr, &nodeToUpdate) != EXIT_SUCCESS)
+    if (getNodeByAddr(unicastAddr, &nodeToUpdate) == EXIT_FAILURE)
+    {
+        ESP_LOGE(tag, "Node unicast addr: [%d] is not among tracked nodes!", unicastAddr);
         return;
+    }
 
-    nodePropIDsCnt = length / SENSOR_DESCRIPTOR_STATE_SIZE;
+    nodePropIDsCnt = length / NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE;
+    printf("\r\nNode has nodePropIDsCnt: [%d]\r\n", nodePropIDsCnt);
 
     for (uint8_t i = 0; i < nodePropIDsCnt; i++)
     {
-        propID = data[(SENSOR_DESCRIPTOR_STATE_SIZE * i) + 1] << 8 | data[(SENSOR_DESCRIPTOR_STATE_SIZE * i)];
-        nodeToUpdate->propIDs[i] = propID;
+        memset(&descriptor, 0, sizeof(descriptor)/sizeof(uint8_t));
+        memcpy(&descriptor, &data[(NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE * i)], sizeof(descriptor)/sizeof(uint8_t));
+
+        memcpy(&(nodeToUpdate->propIDs[i]), &(descriptor.sensorPropId), sizeof(descriptor.sensorPropId));
         nodeToUpdate->propIDsCnt++;
-        printf("FOUND PROP ID [%d]: [%04x]\r\n", i, propID);
+        memcpy(&(nodeToUpdate->nbiotSetup[i]), &(descriptor.nbiotSetup), sizeof(descriptor.nbiotSetup)/sizeof(uint8_t));
+
+        printf("PROP ID             [%d]: [%04x]\r\n", i, nodeToUpdate->propIDs[i]);
+        printf("SENSOR NAME         [%s]\r\n", nodeToUpdate->nbiotSetup[i].name);
+        printf("SENSOR PROP ID NAME [%s]\r\n", nodeToUpdate->nbiotSetup[i].propName);
+        printf("PROP DATA TYPE      [%d]\r\n", nodeToUpdate->nbiotSetup[i].propDataType);
     }
 
     printf("\r\nUpdating property IDs of node: [%x %x %x %x %x %x], Unicast Addr: [%d]\r\n", 
@@ -876,7 +887,7 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, es
     // Delete the node when offline
     if (getNodeTimeoutCnt(resendToNodeAddr, &timeoutCnt) == EXIT_FAILURE)
     {
-        ESP_LOGE(tag, "Node with unicast addr: [%d] is not among tracked nodes!", resendToNodeAddr);
+        ESP_LOGE(tag, "Node unicast addr: [%d] is not among tracked nodes!", resendToNodeAddr);
         return;
     }
     if (timeoutCnt >= MAX_TIMEOUT_RESEND_ATTEMPTS)
@@ -889,7 +900,7 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, es
             memcpy(&deleteDevice.uuid, nodeToDelete->uuid, sizeof(esp_ble_mesh_octet16_t));
             deleteDevice.flag = DEL_DEV_UUID_FLAG;
 
-            ESP_LOGW(tag, "DELETING tracked node with unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
+            ESP_LOGW(tag, "DELETING node. Unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
             esp_ble_mesh_provisioner_delete_dev(&deleteDevice);
             deleteNode(nodeToDelete->btMacAddr);
         }
@@ -900,7 +911,7 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, es
         return;
     }
 
-    ESP_LOGW(tag, "Node with unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
+    ESP_LOGW(tag, "Node unicast addr: [%d] timeout count: [%d]", resendToNodeAddr, timeoutCnt);
     bleMeshSendMsgToServer(resendToNodeAddr, opcode);
 }
 
@@ -1154,9 +1165,16 @@ static uint16_t getNodeBeingServAddr(void)
 }
 
 // Sensor Data Parsing
-static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param)
+static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param, uint16_t unicastAddr)
 {
     static const char* tag = __func__;
+    NbiotBleMeshNode_t* sensorNode;
+
+    if (getNodeByAddr(unicastAddr, &sensorNode) == EXIT_FAILURE)
+    {
+        ESP_LOGE(tag, "Node unicast addr: [%d] is not among tracked nodes!", unicastAddr);
+        return;
+    }
 
     if (param->status_cb.sensor_status.marshalled_sensor_data->len)
     {
@@ -1166,10 +1184,12 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param)
         
         uint8_t *data = param->status_cb.sensor_status.marshalled_sensor_data->data;
         uint16_t length = 0;
+        uint8_t i = 0;
         for (; length < param->status_cb.sensor_status.marshalled_sensor_data->len;)
         {
             uint8_t fmt = ESP_BLE_MESH_GET_SENSOR_DATA_FORMAT(data);
             uint8_t data_len = ESP_BLE_MESH_GET_SENSOR_DATA_LENGTH(data, fmt);
+            uint8_t realDataLen = data_len + 1;
             uint16_t prop_id = ESP_BLE_MESH_GET_SENSOR_DATA_PROPERTY_ID(data, fmt);            
             uint8_t mpid_len = (fmt == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A ? ESP_BLE_MESH_SENSOR_DATA_FORMAT_A_MPID_LEN : ESP_BLE_MESH_SENSOR_DATA_FORMAT_B_MPID_LEN); // marshalled property id length
 
@@ -1179,9 +1199,9 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param)
             if (data_len != ESP_BLE_MESH_SENSOR_DATA_ZERO_LEN)
             {
                 if (nbiotReceivedSensorDataCB != NULL) 
-                    nbiotReceivedSensorDataCB(prop_id, (data + mpid_len), data_len);
+                    nbiotReceivedSensorDataCB(prop_id, (data + mpid_len), realDataLen, &(sensorNode->nbiotSetup[i]));
                 else
-                    ESP_LOGE(tag, "CallBack nbiotReceivedSensorDataCB not registered!");
+                    ESP_LOGE(tag, "CallBack not registered!");
 
                 // ESP_LOG_BUFFER_HEX("Sensor Data Hex", data + mpid_len, data_len + 1);
                 length += mpid_len + data_len + 1;
@@ -1192,6 +1212,7 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param)
                 length += mpid_len;
                 data += mpid_len;
             }
+            i++;
         }
     }
 }

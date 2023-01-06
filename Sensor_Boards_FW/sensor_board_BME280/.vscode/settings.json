@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "esp_ble_mesh_common_api.h": "c",
+        "esp_ble_mesh_defs.h": "c",
+        "nbiot_ble_mesh_node_bme280.h": "c",
+        "typeinfo": "c"
+    }
+}

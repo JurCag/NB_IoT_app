@@ -23,15 +23,7 @@ static void sendSensorServerSeriesStatus(esp_ble_mesh_sensor_server_cb_param_t *
 static uint16_t getSensorServerData(esp_ble_mesh_sensor_state_t *state, uint8_t *data);
 static void updateSensorData(void);
 
-struct sensorServerDescriptor 
-{
-    uint16_t sensorPropId;
-    uint32_t posTolerance:12,
-             negTolerance:12,
-             sampleFunc:8;
-    uint8_t  measurePeriod;
-    uint8_t  updateInterval;
-} __attribute__((packed));
+static NbiotSensorSetup_t nbiotSensorSetup[NBIOT_MAX_PROP_CNT];
 
 struct sensorServerSetting 
 {
@@ -107,6 +99,24 @@ void nbiotBleMeshServerInitSensorStates(esp_ble_mesh_sensor_state_t* nodeSensorS
     sensorStates = nodeSensorStates;
     numOfSensorStates = numOfStates;
 }
+
+void nbiotBleMeshServerInitSensorSetup(NbiotSensorSetup_t* sensorSetupArr, uint8_t len)
+{
+    static const char* tag = __func__;
+
+    if (len < NBIOT_MAX_PROP_CNT)
+    {
+        for (uint8_t i = 0; i < len; i++)
+        {
+            memcpy(&nbiotSensorSetup[i], &sensorSetupArr[i], sizeof(NbiotSensorSetup_t));
+        }
+    }
+    else
+    {
+        ESP_LOGE(tag, "Failed to initialize sensor names");
+    }
+}
+
 
 static esp_err_t bleMeshServerInit(void)
 {
@@ -293,23 +303,22 @@ static void sensorServerCB(esp_ble_mesh_sensor_server_cb_event_t event,
     }
 }                            
 
-
-
 static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param_t *param)
 {
-    struct sensorServerDescriptor descriptor = {0};
+    nbiotSensorServerDescriptor_t descriptor = {0};
     uint8_t *status = NULL;
     uint16_t length = 0;
     esp_err_t err;
     int i;
     static const char* tag = __func__;
 
-    status = calloc(1, numOfSensorStates * ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN);
+    status = calloc(1, numOfSensorStates * NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE);
     if (!status) 
     {
         ESP_LOGE(tag, "No memory for sensor descriptor status!");
         return;
     }
+
 
     if (param->value.get.sensor_descriptor.op_en == false) // Indicates Property ID not included
     {
@@ -327,8 +336,11 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
             descriptor.sampleFunc       = sensorStates[i].descriptor.sampling_function;
             descriptor.measurePeriod    = sensorStates[i].descriptor.measure_period;
             descriptor.updateInterval   = sensorStates[i].descriptor.update_interval;
-            memcpy(status + length, &descriptor, ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN);
-            length += ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN;
+            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_SENSOR_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_SENSOR_PROP_NAME_MAX_LEN);
+            descriptor.nbiotSetup.propDataType = nbiotSensorSetup[i].propDataType;
+            memcpy(status + length, &descriptor, NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE);
+            length += NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE;
         }
         goto send;
     }
@@ -343,8 +355,11 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
             descriptor.sampleFunc       = sensorStates[i].descriptor.sampling_function;
             descriptor.measurePeriod    = sensorStates[i].descriptor.measure_period;
             descriptor.updateInterval   = sensorStates[i].descriptor.update_interval;
-            memcpy(status, &descriptor, ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN);
-            length = ESP_BLE_MESH_SENSOR_DESCRIPTOR_LEN;
+            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_SENSOR_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_SENSOR_PROP_NAME_MAX_LEN);
+            descriptor.nbiotSetup.propDataType = nbiotSensorSetup[i].propDataType;
+            memcpy(status, &descriptor, NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE);
+            length = NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE;
             goto send;
         }
     }
