@@ -7,13 +7,13 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-#include "nbiot_ble_mesh_common.h"
+#include "server_include/nbiot_ble_mesh_common.h"
 #include "esp_ble_mesh_common_api.h"
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_provisioning_api.h"
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_sensor_model_api.h"
-#include "ble_mesh_init.h"
+#include "server_include/ble_mesh_init.h"
 
 #define CID_ESP         0x02E5
 

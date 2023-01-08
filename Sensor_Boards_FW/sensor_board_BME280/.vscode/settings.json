@@ -3,6 +3,10 @@
         "esp_ble_mesh_common_api.h": "c",
         "esp_ble_mesh_defs.h": "c",
         "nbiot_ble_mesh_node_bme280.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "nvs_flash.h": "c",
+        "ble_mesh_init.h": "c",
+        "esp_ble_mesh_sensor_model_api.h": "c",
+        "nbiot_ble_mesh_common.h": "c"
     }
 }

@@ -1,4 +1,4 @@
-#include "nbiot_ble_mesh_server.h"
+#include "server_include/nbiot_ble_mesh_server.h"
 
 /* LOCAL FUNCTIONS DECLARATION */
 static esp_err_t bleMeshServerInit(void);
