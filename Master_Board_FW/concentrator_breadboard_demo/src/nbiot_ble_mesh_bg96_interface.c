@@ -17,13 +17,14 @@ void nbiotCreateTaskSensorDataGathering(void)
 
 static void taskSensorDataGathering(void *pvParameters)
 {
+    static const char* tag = __func__;
     uint8_t nodesCnt = 0;
     NbiotBleMeshNode_t* sensorNode;
 
     while(1)
     {
         TASK_DELAY_MS(4000);
-        printf("NEW LOOP\r\n");
+        ESP_LOGI(tag, "Gathering sensor data...");
 
         nodesCnt = nbiotGetNodesCnt();
         if (nodesCnt > 0)
@@ -61,7 +62,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_UINT8:
         if (dataLen == sizeof(uint8_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((uint8_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((uint8_t*)data));
         }
         else
         {
@@ -72,7 +73,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_INT8:
         if (dataLen == sizeof(int8_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((int8_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((int8_t*)data));
         }
         else
         {
@@ -83,7 +84,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_UINT16:
         if (dataLen == sizeof(uint16_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((uint16_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((uint16_t*)data));
         }
         else
         {
@@ -94,7 +95,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_INT16:
         if (dataLen == sizeof(int16_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((int16_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((int16_t*)data));
         }
         else
         {
@@ -105,7 +106,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_UINT32:  
         if (dataLen == sizeof(uint32_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((uint32_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((uint32_t*)data));
         }
         else
         {
@@ -116,7 +117,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_INT32:   
         if (dataLen == sizeof(int32_t))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, *((int32_t*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", setup->name, setup->propName, setup->mmtUnit, *((int32_t*)data));
         }
         else
         {
@@ -127,7 +128,7 @@ void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  Nbi
     case NBIOT_FLOAT:
         if (dataLen == sizeof(float))
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"value\" : %.2f}", setup->name, setup->propName, *((float*)data));
+            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %.2f}", setup->name, setup->propName, setup->mmtUnit, *((float*)data));
         }
         else
         {

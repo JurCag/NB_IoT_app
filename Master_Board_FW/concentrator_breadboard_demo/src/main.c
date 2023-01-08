@@ -25,8 +25,8 @@ void app_main()
     /* BLE Mesh */
     esp_log_level_set("*", ESP_LOG_INFO);
     nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
+    BG96_registerStartGatheringSensorDataCB(nbiotCreateTaskSensorDataGathering);
     nbiotBleMeshAppMain();
-    nbiotCreateTaskSensorDataGathering();
 
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {

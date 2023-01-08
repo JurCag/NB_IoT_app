@@ -11,30 +11,29 @@ NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 1);
 #define SENSOR_PROPERTY_ID_1        NBIOT_BLE_MESH_PROP_ID_HUMIDITY
 #define SENSOR_PROPERTY_ID_2        NBIOT_BLE_MESH_PROP_ID_PRESSURE
 
-// #define SENSOR_COUNT                (3)
-// char* bme280PropNames[SENSOR_PROP_NAME_MAX_LEN] = {"temperature", "humidity", "pressure"};
-// char* bme280Names[SENSOR_NAME_MAX_LEN] = {SENSOR_NAME, SENSOR_NAME, SENSOR_NAME};
-
 static NbiotSensorSetup_t sensorNbiotSetup[] = 
 {
     {
         .name           = SENSOR_NAME,
         .propName       = "temperature",
-        .propDataType   = NBIOT_FLOAT
+        .propDataType   = NBIOT_FLOAT,
+        .mmtUnit        = "°C"
     },
     {
         .name           = SENSOR_NAME,
         .propName       = "humidity",
-        .propDataType   = NBIOT_FLOAT
+        .propDataType   = NBIOT_FLOAT,
+        .mmtUnit        = "%"
     },
     {
         .name           = SENSOR_NAME,
         .propName       = "pressure",
-        .propDataType   = NBIOT_FLOAT
+        .propDataType   = NBIOT_FLOAT,
+        .mmtUnit        = "hPa"
     }
 };
 
-static void nodeBme280UpdateData(void);
+static void updateNodeData(void);
 
 static esp_ble_mesh_sensor_state_t nodeSensorStates[] =
 {
@@ -149,7 +148,7 @@ void nbiotBleMeshNodeBme280Main(void)
     nbiotBleMeshServerInitSensorSetup(sensorNbiotSetup, sizeof(sensorNbiotSetup)/sizeof(sensorNbiotSetup[0]));
 
     // Register CallBack which updates the node data from sensor
-    nbiotBleMeshRegisterUpdateSensorDataCB(nodeBme280UpdateData);
+    nbiotBleMeshRegisterUpdateSensorDataCB(updateNodeData);
 
     // Start BLE Mesh Server
     nbiotBleMeshServerMain();
@@ -159,12 +158,13 @@ void nbiotBleMeshNodeBme280Main(void)
 }
 
 // This function is unique based on the sensor
-static void nodeBme280UpdateData(void)
+static void updateNodeData(void)
 {
     static const char* tag = "BME280";
     static float temperature;
     static float humidity;
     static float pressure;
+    uint8_t i;
 
     temperature = sensorBme280GetTemperature();
     humidity = sensorBme280GetHumidity();
@@ -172,17 +172,20 @@ static void nodeBme280UpdateData(void)
 
     // NOTE: Very important to reset the net buffer beffore pushing new data,
     // otherwise it causes unpredictable behaviour.
+    i = 0;
     net_buf_simple_reset(&temperatureSensorData);
     net_buf_simple_push_le32(&temperatureSensorData, *(uint32_t*)(&temperature));
-    ESP_LOGI(tag, "Temperature uint32_t from float: [%d])", *(uint32_t*)(&temperature));
-
+    ESP_LOGI(tag, "[%s] value: [%f], units [%s])", sensorNbiotSetup[i].propName, temperature, sensorNbiotSetup[i].mmtUnit);
+    
+    i++;
     net_buf_simple_reset(&humiditySensorData);
     net_buf_simple_push_le32(&humiditySensorData, *(uint32_t*)(&humidity));
-    ESP_LOGI(tag, "Humidity uint32_t from float: [%d])", *(uint32_t*)(&humidity));
-
+    ESP_LOGI(tag, "[%s] value: [%f], units [%s])", sensorNbiotSetup[i].propName, humidity, sensorNbiotSetup[i].mmtUnit);
+    
+    i++;
     net_buf_simple_reset(&pressureSensorData);
     net_buf_simple_push_le32(&pressureSensorData, *(uint32_t*)(&pressure));
-    ESP_LOGI(tag, "Pressure uint32_t from float: [%d])", *(uint32_t*)(&pressure));
+    ESP_LOGI(tag, "[%s] value: [%f], units [%s])", sensorNbiotSetup[i].propName, pressure, sensorNbiotSetup[i].mmtUnit);
 }
 
 

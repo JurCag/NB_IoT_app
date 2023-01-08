@@ -87,7 +87,7 @@ static void taskDataAcq(void *pvParameters)
 		ESP_LOGE(TAG_BME280, "init or setting error. code: %d", com_rslt);
 	}
 
-	ESP_LOGE(TAG_BME280, "DELETING THIS TASK");
+	ESP_LOGE(TAG_BME280, "TASK DELETING ITSELF");
 
 	vTaskDelete(NULL);
 }

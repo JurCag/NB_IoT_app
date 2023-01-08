@@ -11,12 +11,12 @@ typedef enum
     NBIOT_BLE_MESH_PROP_ID_TEMPERATURE      = 0x00C0,   // 4 bytes - float
     NBIOT_BLE_MESH_PROP_ID_PRESSURE         = 0x00C1,   // 4 bytes - float
     NBIOT_BLE_MESH_PROP_ID_HUMIDITY         = 0x00C2,   // 4 bytes - float
+    NBIOT_BLE_MESH_PROP_ID_LIGHT_INTENSITY  = 0x00C3,   // 4 bytes - float
 } NbiotBLEMeshProperties_t;
 
 #define NBIOT_MAX_PROP_CNT                  (8)
-#define NBIOT_SENSOR_PROP_NAME_MAX_LEN      (16)
-#define NBIOT_SENSOR_NAME_MAX_LEN           NBIOT_SENSOR_PROP_NAME_MAX_LEN
-#define NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE  (8 + NBIOT_SENSOR_PROP_NAME_MAX_LEN + NBIOT_SENSOR_NAME_MAX_LEN + 4)
+#define NBIOT_NAME_MAX_LEN                  (16)
+#define NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE  (8 + 3*NBIOT_NAME_MAX_LEN + 4)
 
 typedef enum
 {
@@ -31,9 +31,10 @@ typedef enum
 
 typedef struct
 {
-    char name[NBIOT_SENSOR_NAME_MAX_LEN];
-    char propName[NBIOT_SENSOR_PROP_NAME_MAX_LEN];
+    char name[NBIOT_NAME_MAX_LEN];
+    char propName[NBIOT_NAME_MAX_LEN];
     NbiotSensorPropDataType_t propDataType;
+    char mmtUnit[NBIOT_NAME_MAX_LEN];
 } NbiotSensorSetup_t;
 
 typedef struct

@@ -113,7 +113,7 @@ void nbiotBleMeshServerInitSensorSetup(NbiotSensorSetup_t* sensorSetupArr, uint8
     }
     else
     {
-        ESP_LOGE(tag, "Failed to initialize sensor names");
+        ESP_LOGE(tag, "Failed to initialize sensor setups");
     }
 }
 
@@ -336,9 +336,10 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
             descriptor.sampleFunc       = sensorStates[i].descriptor.sampling_function;
             descriptor.measurePeriod    = sensorStates[i].descriptor.measure_period;
             descriptor.updateInterval   = sensorStates[i].descriptor.update_interval;
-            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_SENSOR_NAME_MAX_LEN);
-            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_SENSOR_PROP_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_NAME_MAX_LEN);
             descriptor.nbiotSetup.propDataType = nbiotSensorSetup[i].propDataType;
+            memcpy(descriptor.nbiotSetup.mmtUnit, nbiotSensorSetup[i].mmtUnit, NBIOT_NAME_MAX_LEN);
             memcpy(status + length, &descriptor, NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE);
             length += NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE;
         }
@@ -355,9 +356,10 @@ static void sendSensorServerDescriptorStatus(esp_ble_mesh_sensor_server_cb_param
             descriptor.sampleFunc       = sensorStates[i].descriptor.sampling_function;
             descriptor.measurePeriod    = sensorStates[i].descriptor.measure_period;
             descriptor.updateInterval   = sensorStates[i].descriptor.update_interval;
-            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_SENSOR_NAME_MAX_LEN);
-            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_SENSOR_PROP_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.name, nbiotSensorSetup[i].name, NBIOT_NAME_MAX_LEN);
+            memcpy(descriptor.nbiotSetup.propName, nbiotSensorSetup[i].propName, NBIOT_NAME_MAX_LEN);
             descriptor.nbiotSetup.propDataType = nbiotSensorSetup[i].propDataType;
+            memcpy(descriptor.nbiotSetup.mmtUnit, nbiotSensorSetup[i].mmtUnit, NBIOT_NAME_MAX_LEN);
             memcpy(status, &descriptor, NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE);
             length = NBIOT_SENSOR_DESCRIPTOR_STATE_SIZE;
             goto send;

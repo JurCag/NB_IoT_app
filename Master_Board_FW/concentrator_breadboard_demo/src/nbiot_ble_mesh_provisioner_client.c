@@ -804,10 +804,13 @@ static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unic
         nodeToUpdate->propIDsCnt++;
         memcpy(&(nodeToUpdate->nbiotSetup[i]), &(descriptor.nbiotSetup), sizeof(descriptor.nbiotSetup)/sizeof(uint8_t));
 
-        printf("PROP ID             [%d]: [%04x]\r\n", i, nodeToUpdate->propIDs[i]);
-        printf("SENSOR NAME         [%s]\r\n", nodeToUpdate->nbiotSetup[i].name);
-        printf("SENSOR PROP ID NAME [%s]\r\n", nodeToUpdate->nbiotSetup[i].propName);
-        printf("PROP DATA TYPE      [%d]\r\n", nodeToUpdate->nbiotSetup[i].propDataType);
+        printf("SENSOR PROP ID[%d]: [%04x], SENSOR NAME: [%s], \r\nPROP ID NAME: [%s], PROP DATA TYPE: [%d], UNIT: [%s]\r\n", 
+                i, 
+                nodeToUpdate->propIDs[i],
+                nodeToUpdate->nbiotSetup[i].name,
+                nodeToUpdate->nbiotSetup[i].propName,
+                nodeToUpdate->nbiotSetup[i].propDataType,
+                nodeToUpdate->nbiotSetup[i].mmtUnit);
     }
 
     printf("\r\nUpdating property IDs of node: [%x %x %x %x %x %x], Unicast Addr: [%d]\r\n", 
