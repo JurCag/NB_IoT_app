@@ -15,8 +15,6 @@
 #include "esp_ble_mesh_sensor_model_api.h"
 #include "ble_mesh_init.h"
 
-#include "sensor_bme280.h"
-
 #define CID_ESP         0x02E5
 
 #define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE   // 0x000 – Unspecified Positive Sensor Tolerance
