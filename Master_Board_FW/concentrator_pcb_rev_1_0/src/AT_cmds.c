@@ -174,6 +174,6 @@ AtCmd_t AT_publishMessages =
     .arg = "",
     .confirmation = "OK",
     .error = "ERROR",
-    .maxRespTime_ms = 15000,
+    .maxRespTime_ms = 30000,
     .maxResendAttemps = 4
 };

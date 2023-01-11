@@ -118,16 +118,21 @@ static void timerConnToServerCB(TimerHandle_t xTimer)
 
 void BG96_mqttCreatePayloadDataQueue(void)
 {
-    payloadDataQueue = xQueueCreate(10, sizeof(PayloadData_t));
+    payloadDataQueue = xQueueCreate(20, sizeof(PayloadData_t));
 }
 
 void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
 {
+    char str[64];
     if (payloadDataQueue != NULL)
     {
+        sprintf(str, "MQTT Payload Data Queue Num of elements: [%d]\r\n", uxQueueMessagesWaiting(payloadDataQueue));
+        dumpDebug(str);
         if(xQueueSend(payloadDataQueue, payloadData.b, 10) == errQUEUE_FULL)
         {
             dumpInfo("MQTT Payload Data Queue: [FULL]\r\n");
+            xQueueReset(payloadDataQueue);
+            dumpInfo("RESET MQTT Payload Data Queue: [EMPTY]\r\n");
         }
     }
     else

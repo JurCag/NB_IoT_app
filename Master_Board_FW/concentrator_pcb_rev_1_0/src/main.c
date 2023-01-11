@@ -3,10 +3,7 @@
 void app_main() 
 {
     /* IO */
-    // TODO: move this into board.c, create fcn initIO()
-    gpio_reset_pin(PWRKEY_PIN);
-    gpio_set_direction(PWRKEY_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_level(PWRKEY_PIN, 0);
+    initIO();
     
     /* UART with PC */
     UART_initConfig(UART_PC);
@@ -25,8 +22,8 @@ void app_main()
     /* BLE Mesh */
     esp_log_level_set("*", ESP_LOG_INFO);
     nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
+    BG96_registerStartGatheringSensorDataCB(nbiotCreateTaskSensorDataGathering);
     nbiotBleMeshAppMain();
-    nbiotCreateTaskSensorDataGathering();
 
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {

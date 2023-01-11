@@ -32,6 +32,9 @@
 #define RESEND_ATTEMPTS                 (4)
 #define WAITING_FOR_SECONDARY_RESPONSE  (2)
 
+/* Uncomment to gather data from sensor boards through BLE even if GSM modem not present */
+#define DEBUG_SENSOR_DATA_GATHERING
+
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
 
@@ -41,8 +44,8 @@
 /* Uncomment to see debug logging (default commented) */
 #define DUMP_DEBUG
 
-/* Typedefs */
-typedef void (*BG96_txPacketCB_t)(char* packet); 
+/* Typedefs */ 
+typedef void (*BG96_startGatheringSensorDataCB_t)(void);
 
 typedef enum
 {
@@ -74,6 +77,7 @@ void BG96_txBytes(char* bytes, uint8_t len);
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
 void BG96_sendMqttData(SensorData_t data);
+void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn);
 
 /* FreeRTOS */
 void createTaskRx(void);

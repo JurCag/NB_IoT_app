@@ -4,6 +4,7 @@
 
 #include <driver/gpio.h>
 #include <driver/uart.h>
+#include <soc/soc.h>
 
 #define PWRKEY_PIN          (GPIO_NUM_10)
 // #define USER_LED_1
@@ -16,5 +17,9 @@
 #define UART_PC             (UART_NUM_0)
 #define UART_PC_TX_PIN      (GPIO_NUM_3)
 #define UART_PC_RX_PIN      (GPIO_NUM_2)
+
+void initIO(void);
+void setPwrKeyHigh(void);
+void setPwrKeyLow(void);
 
 #endif // __BOARD_H__

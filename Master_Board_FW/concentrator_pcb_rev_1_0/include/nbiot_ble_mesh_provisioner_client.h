@@ -33,20 +33,20 @@
 #define APP_KEY_OCTET                   0x12
 #define PROV_START_ADDRESS_OFFSET       0x0005 // Shifts unicast addr from node index
 
-#define SENSOR_DESCRIPTOR_STATE_SIZE    8
 #define PROP_ID_OMITTED                 0
-
-typedef void (*nbiotReceivedSensorData_t) (uint16_t, uint8_t*, uint8_t);
 
 typedef struct
 {
-    uint16_t srvAddr; // unicast addr (each element has it's own, in this NBIoT app each node has only 1 element)
-    uint8_t btMacAddr[BD_ADDR_LEN];
-    NbiotBLEMeshProperties_t propIDs[10];
-    uint8_t propIDsCnt;
-    esp_ble_mesh_octet16_t uuid;
-    uint8_t timeoutCnt;
+    uint16_t                    srvAddr; // unicast addr (each element has it's own, in this NBIoT app each node has only 1 element)
+    uint8_t                     btMacAddr[BD_ADDR_LEN];
+    NbiotBLEMeshProperties_t    propIDs[NBIOT_MAX_PROP_CNT];
+    NbiotSensorSetup_t          nbiotSetup[NBIOT_MAX_PROP_CNT];
+    uint8_t                     propIDsCnt;
+    esp_ble_mesh_octet16_t      uuid;
+    uint8_t                     timeoutCnt;
 } NbiotBleMeshNode_t;
+
+typedef void (*nbiotReceivedSensorData_t) (uint16_t, uint8_t*, uint8_t, NbiotSensorSetup_t*);
 
 #define MAX_SENSOR_NODES (10)
 typedef struct 

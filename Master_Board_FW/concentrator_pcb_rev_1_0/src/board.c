@@ -7,3 +7,12 @@ void initIO(void)
     gpio_set_level(PWRKEY_PIN, 0);
 }
 
+void setPwrKeyHigh(void)
+{
+    gpio_set_level(PWRKEY_PIN, 1);
+}
+
+void setPwrKeyLow(void)
+{
+    gpio_set_level(PWRKEY_PIN, 0);
+}

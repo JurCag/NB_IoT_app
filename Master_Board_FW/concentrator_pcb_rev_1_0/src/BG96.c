@@ -21,6 +21,7 @@ static TaskHandle_t taskTxHandle = NULL;
 static TaskHandle_t taskPowerUpModemHandle = NULL;
 static TaskHandle_t taskFeedTxQueueHandle = NULL;
 static TaskHandle_t taskForwardSensorDataHandle = NULL;
+static BG96_startGatheringSensorDataCB_t startGatheringSensorDataCB = NULL;
 
 /* Local FreeRTOS tasks */
 static void taskRx(void* pvParameters);
@@ -37,6 +38,7 @@ static void BG96_buildAtCmdStr(BG96_AtPacket_t* atPacket, char* atCmdStr, const 
 static void powerUpModem(gpio_num_t pwrKeypin);
 static void swPowerDownModem(void);
 static void queueRxData(RxData_t rxData);
+static void startGatheringSensorData(void);
 
 static uint8_t responseParser(void);
 static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
@@ -255,6 +257,9 @@ static void taskPowerUpModem(void *pvParameters)
             if (i++ > (timeToWaitForPowerUp/250))
             {
                 dumpInfo("Modem power-up: [FAIL]\r\n");
+#ifdef DEBUG_SENSOR_DATA_GATHERING
+                startGatheringSensorData();
+#endif
                 break;
             }
         }
@@ -307,6 +312,8 @@ static void taskFeedTxQueue(void* pvParameters)
                 break;
             case SENDING_SENSOR_DATA:
                 dumpDebug("Ready to receive sensor data\r\n");
+
+                startGatheringSensorData();
                 while(1)
                 {
                     // React's only to one index (notifs with other index leaves pending)
@@ -575,6 +582,17 @@ void BG96_sendMqttData(SensorData_t data)
     }
     else
         dumpInfo("Can't notify non-existing task!\r\n");
+}
+
+void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn)
+{
+    startGatheringSensorDataCB = ptrToFcn;
+}
+
+static void startGatheringSensorData(void)
+{
+    if (startGatheringSensorDataCB != NULL)
+        startGatheringSensorDataCB();
 }
 
 void dumpInterComm(char* str)

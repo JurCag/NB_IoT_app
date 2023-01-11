@@ -10,6 +10,10 @@
 		{
 			"name": "concentrator_pcb_rev_1_0",
 			"path": "Master_Board_FW/concentrator_pcb_rev_1_0"
+		},
+		{
+			"name": "sensor_board_photores",
+			"path": "Sensor_Boards_FW/sensor_board_photores"
 		}
 	],
 	"settings": {
@@ -58,7 +62,12 @@
 			"soc.h": "c",
 			"atomic": "c",
 			"cstdint": "c",
-			"esp_ble_mesh_defs.h": "c"
+			"esp_ble_mesh_defs.h": "c",
+			"adc.h": "c",
+			"esp_adc_cal.h": "c",
+			"ble_mesh_init.h": "c",
+			"sensor_photores.h": "c",
+			"nbiot_ble_mesh_node_photores.h": "c"
 		}
 	}
 }
