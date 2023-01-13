@@ -397,6 +397,7 @@ static esp_err_t nodeProvComplete(uint16_t node_index,
     }
 
     // Store into local struct (yet missing propIDs)
+    memcpy(newNode.name, srvName, sizeof(srvName)/sizeof(char));
     memcpy(&(newNode.btMacAddr), node->addr, BD_ADDR_LEN);
     newNode.srvAddr = unicast_addr;
     memcpy(newNode.uuid, uuid, ESP_BLE_MESH_OCTET16_LEN);
@@ -853,10 +854,6 @@ static void serverResponseTimeout(uint32_t opcode, uint16_t resendToNodeAddr, es
     {
     case ESP_BLE_MESH_MODEL_OP_SENSOR_DESCRIPTOR_GET:
         ESP_LOGW(tag, "Sensor Descriptor Get timeout, opcode 0x%04x", opcode);
-        
-        // // If descriptor got timed out during provisioning
-        // if (!isProvisionerReady())
-        //     resendToNodeAddr = getNodeBeingProvAddr();
         break;
     case ESP_BLE_MESH_MODEL_OP_SENSOR_CADENCE_GET:
         ESP_LOGW(tag, "Sensor Cadence Get timeout, opcode 0x%04x", opcode);
@@ -1172,6 +1169,7 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param, uint1
 {
     static const char* tag = __func__;
     NbiotBleMeshNode_t* sensorNode;
+    NbiotRecvSensorData_t recvSensorData[NBIOT_MAX_PROP_CNT];
 
     if (getNodeByAddr(unicastAddr, &sensorNode) == EXIT_FAILURE)
     {
@@ -1201,10 +1199,9 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param, uint1
 
             if (data_len != ESP_BLE_MESH_SENSOR_DATA_ZERO_LEN)
             {
-                if (nbiotReceivedSensorDataCB != NULL) 
-                    nbiotReceivedSensorDataCB(prop_id, (data + mpid_len), realDataLen, &(sensorNode->nbiotSetup[i]));
-                else
-                    ESP_LOGE(tag, "CallBack not registered!");
+                recvSensorData[i].propId    = prop_id;
+                recvSensorData[i].data      = data + mpid_len;
+                recvSensorData[i].dataLen   = realDataLen;
 
                 // ESP_LOG_BUFFER_HEX("Sensor Data Hex", data + mpid_len, data_len + 1);
                 length += mpid_len + data_len + 1;
@@ -1217,6 +1214,11 @@ static void sensorDataParser(esp_ble_mesh_sensor_client_cb_param_t* param, uint1
             }
             i++;
         }
+
+        if (nbiotReceivedSensorDataCB != NULL) 
+            nbiotReceivedSensorDataCB(sensorNode, recvSensorData);
+        else
+            ESP_LOGE(tag, "CallBack not registered!");
     }
 }
 

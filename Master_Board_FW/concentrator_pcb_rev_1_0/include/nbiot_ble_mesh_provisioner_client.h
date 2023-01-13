@@ -37,6 +37,7 @@
 
 typedef struct
 {
+    char                        name[32];
     uint16_t                    srvAddr; // unicast addr (each element has it's own, in this NBIoT app each node has only 1 element)
     uint8_t                     btMacAddr[BD_ADDR_LEN];
     NbiotBLEMeshProperties_t    propIDs[NBIOT_MAX_PROP_CNT];
@@ -46,7 +47,14 @@ typedef struct
     uint8_t                     timeoutCnt;
 } NbiotBleMeshNode_t;
 
-typedef void (*nbiotReceivedSensorData_t) (uint16_t, uint8_t*, uint8_t, NbiotSensorSetup_t*);
+typedef struct
+{
+    uint16_t    propId;
+    uint8_t*    data;
+    uint8_t     dataLen;
+} NbiotRecvSensorData_t;
+
+typedef void (*nbiotReceivedSensorData_t) (NbiotBleMeshNode_t*, NbiotRecvSensorData_t*);
 
 #define MAX_SENSOR_NODES (10)
 typedef struct 

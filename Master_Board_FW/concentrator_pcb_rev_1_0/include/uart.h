@@ -13,7 +13,7 @@
 #define UARTx_RTS_PIN   (UART_PIN_NO_CHANGE)
 #define UARTx_CTS_PIN   (UART_PIN_NO_CHANGE)
 
-#define BUFFER_SIZE     (256)
+#define BUFFER_SIZE     (512)
 
 typedef struct
 {

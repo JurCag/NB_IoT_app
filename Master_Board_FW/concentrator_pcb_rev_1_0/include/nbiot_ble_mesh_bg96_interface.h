@@ -5,6 +5,6 @@
 #include "BG96.h"
 
 void nbiotCreateTaskSensorDataGathering(void);
-void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  NbiotSensorSetup_t* setup);
+void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* dataArr);
 
 #endif // __NBIOT_BLE_MESH_BG96_INTERFACE_H__

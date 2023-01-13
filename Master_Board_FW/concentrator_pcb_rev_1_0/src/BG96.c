@@ -1,5 +1,7 @@
 #include "BG96.h"
 
+#define UART_FULL_THRESH_DEFAULT        (120) // this is the macro from platformio\packages\framework-espidf\components\driver\uart.c
+
 // Common indexes for this connection/application (BG96 can theoretically open more connections to the GSM network)
 ContextID_t contextID = CONTEXT_ID_1;
 char contextIdStr[8];
@@ -20,7 +22,6 @@ static TaskHandle_t taskRxHandle = NULL;
 static TaskHandle_t taskTxHandle = NULL;
 static TaskHandle_t taskPowerUpModemHandle = NULL;
 static TaskHandle_t taskFeedTxQueueHandle = NULL;
-static TaskHandle_t taskForwardSensorDataHandle = NULL;
 static BG96_startGatheringSensorDataCB_t startGatheringSensorDataCB = NULL;
 
 /* Local FreeRTOS tasks */
@@ -28,7 +29,6 @@ static void taskRx(void* pvParameters);
 static void taskTx(void *pvParameters);
 static void taskPowerUpModem(void *pvParameters);
 static void taskFeedTxQueue(void* pvParameters);
-static void taskForwardSensorData(void* pvParameters);
 
 // static void taskTest(void *pvParameters);
 
@@ -51,7 +51,7 @@ void BG96_txStr(char* str)
     dumpInterComm(str);
 }
 
-void BG96_txBytes(char* bytes, uint8_t len)
+void BG96_txBytes(char* bytes, uint16_t len)
 {
     uart_write_bytes(UART_BG96, bytes, len);
 }
@@ -112,7 +112,7 @@ void createTaskTx(void)
     xTaskCreate(
                 taskTx,                         /* Task function */
                 "taskTx",                       /* Name of task */
-                2048,                           /* Stack size of task */
+                4096,                           /* Stack size of task */
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 3,           /* Priority of the task */
                 &taskTxHandle                   /* Handle of created task */
@@ -140,18 +140,6 @@ void createTaskFeedTxQueue(void)
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 1,           /* Priority of the task */
                 &taskFeedTxQueueHandle          /* Handle of created task */
-                );
-}
-
-void createTaskForwardSensorData(void)
-{
-    xTaskCreate(
-                taskForwardSensorData,          /* Task function */
-                "taskForwardSensorData",        /* Name of task */
-                2048,                           /* Stack size of task */
-                NULL,                           /* Parameter of the task */
-                tskIDLE_PRIORITY + 2,           /* Priority of the task */
-                &taskForwardSensorDataHandle    /* Handle of created task */
                 );
 }
 
@@ -338,7 +326,7 @@ static void taskTx(void *pvParameters)
 
     while(1)
     {
-        if (xQueueReceive(atPacketsTxQueue, &deqdAtPacket, MS_TO_TICKS(20)) == pdTRUE)
+        if (xQueueReceive(atPacketsTxQueue, &deqdAtPacket, MS_TO_TICKS(200)) == pdTRUE)
         {
             for(uint8_t sendAttempt = 0; sendAttempt < deqdAtPacket.atCmd->maxResendAttemps; sendAttempt++)
             {
@@ -444,20 +432,43 @@ static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data)
 static void taskRx(void* pvParameters)
 {
     static int readLen;
+    static uint8_t longDataReceived = 0;
+    static RxData_t rxDataPart;
     static RxData_t rxData;
 
     while(1)
     {
-        readLen = uart_read_bytes(UART_BG96, rxData.b, BUFFER_SIZE, MS_TO_TICKS(5));
-        if (readLen > 0)
+        readLen = 0;
+        memset(rxDataPart.b, '\0', sizeof(rxDataPart));
+
+        readLen = uart_read_bytes(UART_BG96, rxDataPart.b, BUFFER_SIZE, MS_TO_TICKS(10));
+        if (readLen >= UART_FULL_THRESH_DEFAULT)
         {
-            queueRxData(rxData);
-            dumpInterComm("[BG96 ->] ");
-            dumpInterComm(rxData.b);
-            memset(rxData.b, '\0', sizeof(rxData.b));
+            // dumpDebug("RX FIFO THRESHOLD REACHED -> CONCAT RX DATA");
+            strcat(rxData.b, rxDataPart.b);
+            longDataReceived = 1;
+        }
+        else if ((readLen > 0) || (longDataReceived == 1))
+        {
+            if (longDataReceived == 1)
+            {
+                queueRxData(rxData);
+                dumpInterComm("[BG96 ->] ");
+                dumpInterComm(rxData.b);
+                memset(rxData.b, '\0', sizeof(rxData.b));
+                longDataReceived = 0;
+            }
+            else
+            {
+                queueRxData(rxDataPart);
+                dumpInterComm("[BG96 ->] ");
+                dumpInterComm(rxDataPart.b);
+                memset(rxDataPart.b, '\0', sizeof(rxDataPart.b));
+            }
         }
     }
 }
+
 
 static void powerUpModem(gpio_num_t pwrKeypin) 
 {
@@ -537,36 +548,6 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
         }
     }
     arg[strlen(arg)-1] = '\0';
-}
-
-void taskForwardSensorData(void* pvParameters)
-{
-    static int readLen;
-    static SensorData_t sensorData;
-
-    // TODO: Delete these
-    for (uint8_t i = 0; i < 3; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{ \"sensorName\" : \"%s\", \"data\" : %d%d%d}", "tempSensor", i+1,i+1,i+1);
-        dumpDebug("NEXT ");
-        dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
-    }
-
-    memset(sensorData.b, '\0', sizeof(sensorData.b));
-    while(1)
-    {
-        readLen = uart_read_bytes(UART_PC, sensorData.b, BUFFER_SIZE, MS_TO_TICKS(5));
-        if (readLen > 0)
-        {
-            // queueSensorData(sensorData);
-            BG96_mqttQueuePayloadData(sensorData);
-            xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
-            memset(sensorData.b, '\0', sizeof(sensorData.b));
-        }
-    }
 }
 
 // TODO: create function like this:

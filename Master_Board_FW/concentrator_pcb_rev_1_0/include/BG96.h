@@ -73,7 +73,7 @@ QueueHandle_t rxDataQueue;
 
 /* Functions */
 void BG96_txStr(char* str);
-void BG96_txBytes(char* bytes, uint8_t len);
+void BG96_txBytes(char* bytes, uint16_t len);
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
 void BG96_sendMqttData(SensorData_t data);
@@ -84,7 +84,6 @@ void createTaskRx(void);
 void createTaskTx(void);
 void createTaskPowerUpModem(gpio_num_t pwrKeyPin);
 void createTaskFeedTxQueue(void);
-void createTaskForwardSensorData(void);
 
 void createRxDataQueue(void);
 void createAtPacketsTxQueue(void);

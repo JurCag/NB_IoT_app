@@ -326,7 +326,7 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                         }
                         else
                         {
-                            dumpInfo("MQTT payload: [FAIL]\r\n");
+                            dumpInfo("\nMQTT payload: [FAIL]\n");
                         }
                     }
                 }

@@ -67,7 +67,8 @@
 			"esp_adc_cal.h": "c",
 			"ble_mesh_init.h": "c",
 			"sensor_photores.h": "c",
-			"nbiot_ble_mesh_node_photores.h": "c"
+			"nbiot_ble_mesh_node_photores.h": "c",
+			"random": "c"
 		}
 	}
 }

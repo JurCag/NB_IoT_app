@@ -50,127 +50,143 @@ static void taskSensorDataGathering(void *pvParameters)
     }
 }
 
-void nbiotSensorDataToBg96(uint16_t propId, uint8_t* data, uint8_t dataLen,  NbiotSensorSetup_t* setup)
+void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* dataArr)
 {
     static const char* tag = __func__;
     static SensorData_t jsonData;
+    char tmpStr[256];
 
-    memset(jsonData.b, '\0', sizeof(jsonData.b));  
+    memset(jsonData.b, '\0', sizeof(jsonData.b));
 
-    switch (setup->propDataType)
+    strcpy(jsonData.b, "{\"nodeName\" : ");       // {"nodeName" : 
+    memset(tmpStr, '\0', sizeof(tmpStr));
+    sprintf(tmpStr, "\"%s\"", node->name);
+    strcat(jsonData.b, tmpStr);                   // {"nodeName" : "NODE-00"
+    strcat(jsonData.b, ",\"measurements\" : [");  // {"nodeName" : "NODE-00","measurements" : [
+
+    for (uint8_t i = 0; i < node->propIDsCnt; i++)
     {
-    case NBIOT_UINT8:
-        if (dataLen == sizeof(uint8_t))
+        memset(tmpStr, '\0', sizeof(tmpStr));
+        switch (node->nbiotSetup[i].propDataType)
         {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
-                    setup->name, 
-                    setup->propName, 
-                    setup->mmtUnit,
-                    *((uint8_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(uint8_t), dataLen);
+        case NBIOT_UINT8:
+            if (dataArr[i].dataLen == sizeof(uint8_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
+                        node->nbiotSetup[i].name, 
+                        node->nbiotSetup[i].propName, 
+                        node->nbiotSetup[i].mmtUnit,
+                        *((uint8_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(uint8_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_INT8:
+            if (dataArr[i].dataLen == sizeof(int8_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
+                        node->nbiotSetup[i].name, 
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((int8_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(int8_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_UINT16:
+            if (dataArr[i].dataLen == sizeof(uint16_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
+                        node->nbiotSetup[i].name, 
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((uint16_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(uint16_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_INT16:
+            if (dataArr[i].dataLen == sizeof(int16_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
+                        node->nbiotSetup[i].name, 
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((int16_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(int16_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_UINT32:  
+            if (dataArr[i].dataLen == sizeof(uint32_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}",
+                        node->nbiotSetup[i].name,
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((uint32_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(uint32_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_INT32:   
+            if (dataArr[i].dataLen == sizeof(int32_t))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}",
+                        node->nbiotSetup[i].name,
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((int32_t*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(int32_t), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        case NBIOT_FLOAT:
+            if (dataArr[i].dataLen == sizeof(float))
+            {
+                sprintf(tmpStr, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %.2f}",
+                        node->nbiotSetup[i].name,
+                        node->nbiotSetup[i].propName,
+                        node->nbiotSetup[i].mmtUnit,
+                        *((float*)(dataArr[i].data)));
+            }
+            else
+            {
+                ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", node->propIDs[i], sizeof(float), dataArr[i].dataLen);
+                return;
+            }
+            break;
+        default:
+            ESP_LOGE(tag, "Unknown property data type: [%d]", node->nbiotSetup[i].propDataType);
             return;
+            break;
         }
-        break;
-    case NBIOT_INT8:
-        if (dataLen == sizeof(int8_t))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
-                    setup->name, 
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((int8_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(int8_t), dataLen);
-            return;
-        }
-        break;
-    case NBIOT_UINT16:
-        if (dataLen == sizeof(uint16_t))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
-                    setup->name, 
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((uint16_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(uint16_t), dataLen);
-            return;
-        }
-        break;
-    case NBIOT_INT16:
-        if (dataLen == sizeof(int16_t))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}", 
-                    setup->name, 
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((int16_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(int16_t), dataLen);
-            return;
-        }
-        break;
-    case NBIOT_UINT32:  
-        if (dataLen == sizeof(uint32_t))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}",
-                    setup->name,
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((uint32_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(uint32_t), dataLen);
-            return;
-        }
-        break;
-    case NBIOT_INT32:   
-        if (dataLen == sizeof(int32_t))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %d}",
-                    setup->name,
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((int32_t*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(int32_t), dataLen);
-            return;
-        }
-        break;
-    case NBIOT_FLOAT:
-        if (dataLen == sizeof(float))
-        {
-            sprintf(jsonData.b, "{ \"sensorName\" : \"%s\", \"physicalQuantity\" : \"%s\", \"unit\" : \"%s\", \"value\" : %.2f}",
-                    setup->name,
-                    setup->propName,
-                    setup->mmtUnit,
-                    *((float*)data));
-        }
-        else
-        {
-            ESP_LOGE(tag, "Wrong length of Sensor Data PropertyId: [0x%04x], expected [%d], actual: [%d]", propId, sizeof(float), dataLen);
-            return;
-        }
-        break;
-    default:
-        ESP_LOGE(tag, "Unknown property data type: [%d]", setup->propDataType);
-        return;
-        break;
+
+        strcat(jsonData.b, tmpStr);
+
+        if (i < (node->propIDsCnt - 1))
+            strcat(jsonData.b, ",");
     }
 
-    BG96_sendMqttData(jsonData);
+    strcat(jsonData.b, "]}");
     printf(jsonData.b);
+    BG96_sendMqttData(jsonData);
 }
-
