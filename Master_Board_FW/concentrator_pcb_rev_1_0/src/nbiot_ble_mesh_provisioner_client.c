@@ -43,8 +43,6 @@ static void newNodeProvTimerCB(TimerHandle_t xTimer);
 static NbiotBleMeshNode_t newNode;
 
 // Track provisioned nodes
-// static NbiotBleMeshNode_t nbiotBleMesh.sensorNodes[MAX_SENSOR_NODES];
-// static uint8_t nbiotBleMesh.nodesCnt = 0;
 static NbiotBleMesh_t nbiotBleMesh;
 static uint8_t insertNode(NbiotBleMeshNode_t* node);
 static void deleteNode(uint8_t btMacAddr[BD_ADDR_LEN]);

@@ -352,7 +352,7 @@ static void taskTx(void *pvParameters)
 static uint8_t responseParser(void)
 {
     static RxData_t rxData;
-    static char sentCmdStr[BUFFER_SIZE];
+    // static char sentCmdStr[BUFFER_SIZE];
 
     if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd->maxRespTime_ms)) == pdTRUE)
     {

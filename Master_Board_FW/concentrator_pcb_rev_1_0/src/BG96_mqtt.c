@@ -8,6 +8,7 @@ static uint8_t qos = 1;
 
 static void mqttInputPayload(char* payload);
 uint8_t isInfoResponseCorrect(char* rxResponse, AtCmd_t* atCmd, uint8_t* paramsArr, uint8_t numOfParams);
+static void gsmConnectionStartOver(void);
 
 TimerHandle_t timerConnToServer = NULL;
 static void timerConnToServerCB(TimerHandle_t xTimer);
@@ -104,6 +105,7 @@ void BG96_mqttConnToServer(void)
                 xTimerStop(timerConnToServer, 0);
                 xTimerDelete(timerConnToServer, MS_TO_TICKS(50));
                 dumpInfo("MQTT open: [EXPIRED]\r\n");
+                gsmConnectionStartOver();
                 break;
             }
             TASK_DELAY_MS(250);
@@ -204,6 +206,9 @@ void BG96_mqttPubQueuedData(void)
             xTimerDelete(timerPubData, MS_TO_TICKS(50));
             timerPubData = NULL;
             dumpInfo("MQTT connect: [EXPIRED]\r\n");
+
+            // Directly reset
+            gsmConnectionStartOver();
             break;
         }
     }
@@ -248,6 +253,7 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                     else
                     {
                         dumpInfo("MQTT open: [FAIL]\r\n");
+                        gsmConnectionStartOver();
                     }
                 }
             }
@@ -281,6 +287,7 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                         else
                         {
                             dumpInfo("MQTT connect: [FAIL]\r\n");
+                            gsmConnectionStartOver();
                         }
                     }
                 }
@@ -375,3 +382,9 @@ uint8_t isInfoResponseCorrect(char* rxResponse, AtCmd_t* atCmd, uint8_t* paramsA
     else
         return EXIT_FAILURE;
 } 
+
+static void gsmConnectionStartOver(void)
+{
+    dumpInfo("Restartig ESP to start the GSM connection over.\n");
+    esp_restart();
+}
