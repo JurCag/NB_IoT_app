@@ -14,6 +14,14 @@
 		{
 			"name": "sensor_board_photores",
 			"path": "Sensor_Boards_FW/sensor_board_photores"
+		},
+		{
+			"name": "sensor_board_current",
+			"path": "Sensor_Boards_FW/sensor_board_current"
+		},
+		{
+			"name": "sensor_board_co2",
+			"path": "Sensor_Boards_FW/sensor_board_co2"
 		}
 	],
 	"settings": {
@@ -68,7 +76,32 @@
 			"ble_mesh_init.h": "c",
 			"sensor_photores.h": "c",
 			"nbiot_ble_mesh_node_photores.h": "c",
-			"random": "c"
+			"random": "c",
+			"led_strip_rmt_encoder.h": "c",
+			"rmt_encoder.h": "c",
+			"rmt_types.h": "c",
+			"clk_tree_defs.h": "c",
+			"led_strip.h": "c",
+			"led_strip_interface.h": "c",
+			"rmt_tx.h": "c",
+			"esp_clk.h": "c",
+			"rmt_ll.h": "c",
+			"periph_ctrl.h": "c",
+			"periph_defs.h": "c",
+			"rmt_private.h": "c",
+			"rmt_common.h": "c",
+			"rtc.h": "c",
+			"clk_ctrl_os.h": "c",
+			"rmt_periph.h": "c",
+			"sensor_current.h": "c",
+			"nbiot_ble_mesh_node_current.h": "c",
+			"nbiot_ble_mesh_node_acs712.h": "c",
+			"sensor_acs712.h": "c",
+			"esp_err.h": "c",
+			"mhz19b.h": "c",
+			"esp_idf_lib_helpers.h": "c",
+			"nbiot_ble_mesh_node_mhz19b.h": "c",
+			"sensor_mhz19b.h": "c"
 		}
 	}
 }
