@@ -30,6 +30,12 @@ static void taskTx(void *pvParameters);
 static void taskPowerUpModem(void *pvParameters);
 static void taskFeedTxQueue(void* pvParameters);
 
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+static TaskHandle_t taskTestNbiotLimitsHandle = NULL;
+static void taskTestNbiotLimits(void* pvParameters);
+static void createTaskTestNbiotLimits(void);
+#endif
+
 // static void taskTest(void *pvParameters);
 
 /* Local functions */
@@ -136,12 +142,26 @@ void createTaskFeedTxQueue(void)
     xTaskCreate(
                 taskFeedTxQueue,                /* Task function */
                 "taskFeedTxQueue",              /* Name of task */
-                4096,                           /* Stack size of task */
+                8192,                           /* Stack size of task */
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 1,           /* Priority of the task */
                 &taskFeedTxQueueHandle          /* Handle of created task */
                 );
 }
+
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+static void createTaskTestNbiotLimits(void)
+{
+    xTaskCreate(
+                taskTestNbiotLimits,                /* Task function */
+                "taskTestNbiotLimits",              /* Name of task */
+                8192,                           /* Stack size of task */
+                NULL,                           /* Parameter of the task */
+                tskIDLE_PRIORITY + 1,           /* Priority of the task */
+                &taskTestNbiotLimitsHandle          /* Handle of created task */
+                );
+}
+#endif
 
 /* Create FreeRTOS queues */
 void createRxDataQueue(void)
@@ -301,7 +321,11 @@ static void taskFeedTxQueue(void* pvParameters)
             case SENDING_SENSOR_DATA:
                 dumpDebug("Ready to receive sensor data\r\n");
 
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+                createTaskTestNbiotLimits();
+#else
                 startGatheringSensorData();
+#endif
                 while(1)
                 {
                     // React's only to one index (notifs with other index leaves pending)
@@ -317,6 +341,73 @@ static void taskFeedTxQueue(void* pvParameters)
         TASK_DELAY_MS(100);
     }
 }
+
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+static void taskTestNbiotLimits(void *pvParameters)
+{
+    static SensorData_t sensorData;
+    /* PIN SPOT: Test limits of NB IoT network
+    * 32   Bytes: "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d"
+    * 128  Bytes: "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d"
+    * 256  Bytes: "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d"
+    * 512  Bytes: "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d"
+    * 1024 Bytes: "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d"
+    */
+    dumpDebug("Delay START\r\n");
+    TASK_DELAY_MS(4000);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d", i%10);
+        dumpDebug("NEXT");
+        dumpDebug(sensorData.b);
+        BG96_mqttQueuePayloadData(sensorData);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+    }
+    TASK_DELAY_MS(7000);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d", i%10);
+        dumpDebug("NEXT");
+        dumpDebug(sensorData.b);
+        BG96_mqttQueuePayloadData(sensorData);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+    }
+    TASK_DELAY_MS(7000);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d", i%10);
+        dumpDebug("NEXT");
+        dumpDebug(sensorData.b);
+        BG96_mqttQueuePayloadData(sensorData);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+    }
+    TASK_DELAY_MS(7000);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d", i%10);
+        dumpDebug("NEXT");
+        dumpDebug(sensorData.b);
+        BG96_mqttQueuePayloadData(sensorData);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+    }
+    TASK_DELAY_MS(7000);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d", i%10);
+        dumpDebug("NEXT");
+        dumpDebug(sensorData.b);
+        BG96_mqttQueuePayloadData(sensorData);
+        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+    }
+    dumpDebug("FINISH\r\n");
+    vTaskDelete(NULL);
+}
+#endif
 
 static void taskTx(void *pvParameters)
 {

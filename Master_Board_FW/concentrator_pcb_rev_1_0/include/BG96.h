@@ -35,6 +35,9 @@
 /* Uncomment to gather data from sensor boards through BLE even if GSM modem not present */
 #define DEBUG_SENSOR_DATA_GATHERING
 
+/* Uncomment to test upload datarate of NB IoT by sending random byte fixed-length payloads */
+// #define TEST_NBIOT_UPLOAD_DATARATE
+
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
 

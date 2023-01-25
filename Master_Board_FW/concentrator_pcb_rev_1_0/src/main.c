@@ -19,14 +19,16 @@ void app_main()
     sprintf(str, "\r\nConfig FreeRTOS freq = %d Hz\r\n", CONFIG_FREERTOS_HZ);
     UART_writeStr(UART_PC, str);
 
-    /* BLE Mesh */
-    esp_log_level_set("*", ESP_LOG_INFO);
-    nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
-    BG96_registerStartGatheringSensorDataCB(nbiotCreateTaskSensorDataGathering);
-    nbiotBleMeshAppMain();
-
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {
+        // BG96_mqttCreatePayloadDataQueue();
+
+        /* BLE Mesh */
+        esp_log_level_set("*", ESP_LOG_INFO);
+        nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);
+        BG96_registerStartGatheringSensorDataCB(nbiotCreateTaskSensorDataGathering);
+        nbiotBleMeshAppMain();
+
         /* Initialize FreeRTOS components */
         createRxDataQueue();
         createAtPacketsTxQueue();

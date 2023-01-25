@@ -3,15 +3,33 @@
 static TaskHandle_t taskSensorDataGatheringHandle = NULL;
 static void taskSensorDataGathering(void *pvParameters);
 
+static TaskHandle_t taskSensorDataQueueingHandle = NULL;
+static void taskSensorDataQueueing(void *pvParameters);
+static void nbiotCreateTaskSensorDataQueueing(void);
+
+static SensorData_t jsonData;
+
 void nbiotCreateTaskSensorDataGathering(void)
 {
     xTaskCreate(
                 taskSensorDataGathering,                /* Task function */
                 "taskSensorDataGathering",              /* Name of task */
-                2048,                                   /* Stack size of task */
+                4096,                                   /* Stack size of task */
                 NULL,                                   /* Parameter of the task */
                 tskIDLE_PRIORITY + 1,                   /* Priority of the task */
                 &taskSensorDataGatheringHandle          /* Handle of created task */
+                );
+}
+
+static void nbiotCreateTaskSensorDataQueueing(void)
+{
+    xTaskCreate(
+                taskSensorDataQueueing,                /* Task function */
+                "taskSensorDataQueueing",              /* Name of task */
+                8192,                                   /* Stack size of task */
+                NULL,                                   /* Parameter of the task */
+                tskIDLE_PRIORITY + 1,                   /* Priority of the task */
+                &taskSensorDataQueueingHandle          /* Handle of created task */
                 );
 }
 
@@ -21,17 +39,20 @@ static void taskSensorDataGathering(void *pvParameters)
     uint8_t nodesCnt = 0;
     NbiotBleMeshNode_t* sensorNode;
 
+    nbiotCreateTaskSensorDataQueueing();
+
     while(1)
     {
-        TASK_DELAY_MS(5000);
+        // TASK_DELAY_MS(5000);
         ESP_LOGI(tag, "Gathering sensor data...");
 
+        TASK_DELAY_MS(2000);
         nodesCnt = nbiotGetNodesCnt();
         if (nodesCnt > 0)
         {
             for (uint8_t nodeIdx = 0; nodeIdx < nodesCnt; nodeIdx++)
             {
-                TASK_DELAY_MS(5000);
+                TASK_DELAY_MS(2000);
                 ESP_LOGI(tag, "Sending request to get sensor data.");
 
                 if (nbiotGetNodeByIdx(nodeIdx, &sensorNode) == EXIT_SUCCESS)
@@ -53,7 +74,6 @@ static void taskSensorDataGathering(void *pvParameters)
 void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* dataArr)
 {
     static const char* tag = __func__;
-    static SensorData_t jsonData;
     char tmpStr[256];
 
     memset(jsonData.b, '\0', sizeof(jsonData.b));
@@ -187,6 +207,18 @@ void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* data
     }
 
     strcat(jsonData.b, "]}");
-    printf(jsonData.b);
-    BG96_sendMqttData(jsonData);
+    // dumpInfo(jsonData.b);
+    
+    xTaskNotifyGive(taskSensorDataQueueingHandle);
+}
+
+static void taskSensorDataQueueing(void *pvParameters)
+{
+    while(1)
+    {
+        if (ulTaskNotifyTake(pdFALSE, MS_TO_TICKS(1000)) > 0)
+        {
+            BG96_sendMqttData(jsonData);
+        }
+    }
 }

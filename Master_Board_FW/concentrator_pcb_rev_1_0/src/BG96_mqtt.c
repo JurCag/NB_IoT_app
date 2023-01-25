@@ -19,6 +19,10 @@ static void timerPubDataCB(TimerHandle_t xTimer);
 static uint8_t timerPubDataExpired = 0;
 
 static QueueHandle_t payloadDataQueue = NULL;
+#define PAYLOAD_DATA_QUEUE_LENGTH       (20)
+#define PAYLOAD_DATA_QUEUE_ITEM_SIZE    (sizeof(PayloadData_t))
+static StaticQueue_t xStaticQueue;
+uint8_t ucQueueStorageArea[ PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE ];
  
 
 void BG96_checkIfConnectedToMqttServer(void)
@@ -120,7 +124,11 @@ static void timerConnToServerCB(TimerHandle_t xTimer)
 
 void BG96_mqttCreatePayloadDataQueue(void)
 {
-    payloadDataQueue = xQueueCreate(20, sizeof(PayloadData_t));
+    // Stored in RAM - queue is allocated during compilation
+    payloadDataQueue = xQueueCreateStatic(PAYLOAD_DATA_QUEUE_LENGTH,
+                                          PAYLOAD_DATA_QUEUE_ITEM_SIZE,
+                                          ucQueueStorageArea,
+                                          &xStaticQueue);
 }
 
 void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
@@ -333,7 +341,7 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                         }
                         else
                         {
-                            dumpInfo("\nMQTT payload: [FAIL]\n");
+                            dumpInfo("\r\nMQTT payload: [FAIL]\r\n");
                         }
                     }
                 }
