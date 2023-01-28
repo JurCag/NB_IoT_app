@@ -18,7 +18,7 @@ TimerHandle_t timerPubData = NULL;
 static void timerPubDataCB(TimerHandle_t xTimer);
 static uint8_t timerPubDataExpired = 0;
 
-#define PAYLOAD_DATA_QUEUE_LENGTH       (20)
+#define PAYLOAD_DATA_QUEUE_LENGTH       (30)
 #define PAYLOAD_DATA_QUEUE_ITEM_SIZE    (sizeof(PayloadData_t))
 static StaticQueue_t payloadDataStaticQueue;
 static uint8_t payloadDataQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE];
@@ -135,7 +135,7 @@ void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
     char str[64];
     if (payloadDataQueue != NULL)
     {
-        sprintf(str, "MQTT Payload Data Queue Num of elements: [%d]\r\n", uxQueueMessagesWaiting(payloadDataQueue));
+        sprintf(str, "MQTT Payload Data Queue Num of elements: [%d/%d]\r\n", uxQueueMessagesWaiting(payloadDataQueue), PAYLOAD_DATA_QUEUE_LENGTH);
         dumpDebug(str);
         if(xQueueSend(payloadDataQueue, payloadData.b, 10) == errQUEUE_FULL)
         {
@@ -230,7 +230,7 @@ static void timerPubDataCB(TimerHandle_t xTimer)
     timerPubDataExpired = 1;
 }
 
-void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
+uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
 {
     BG96_AtPacket_t tempPacket; // sent packet
     char tempData[BUFFER_SIZE];
@@ -240,119 +240,150 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
     uint8_t expInfoArgs[8];
     static uint8_t i = 0;
 
+    static uint8_t resendPayload = 0;
+
+
     memcpy(&tempPacket, packet, sizeof(BG96_AtPacket_t));
     memcpy(tempData, data, BUFFER_SIZE);
 
     switch (tempPacket.atCmd.id)
     {
-        case CONFIGURE_OPTIONAL_PARAMETERS_OF_MQTT:
-
-            break;
-        case OPEN_A_NETWORK_CONNECTION_FOR_MQTT_CLIENT:
-            if (tempPacket.atCmdType == WRITE_COMMAND)
+    case CONFIGURE_OPTIONAL_PARAMETERS_OF_MQTT:
+        return EXIT_SUCCESS;
+        break;
+    case OPEN_A_NETWORK_CONNECTION_FOR_MQTT_CLIENT:
+        if (tempPacket.atCmdType == WRITE_COMMAND)
+        {
+            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
             {
-                if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+                i = 0;
+                expInfoArgs[i++] = client_idx;
+                expInfoArgs[i++] = NETWORK_OPENED_SUCCESSFULLY;
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                 {
-                    i = 0;
-                    expInfoArgs[i++] = client_idx;
-                    expInfoArgs[i++] = NETWORK_OPENED_SUCCESSFULLY;
-                    if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
-                    {
-                        mqttOpened = 1;
-                        dumpInfo("MQTT open: [SUCCESS]\r\n");
-                    }
-                    else
-                    {
-                        dumpInfo("MQTT open: [FAIL]\r\n");
-                        gsmConnectionStartOver();
-                    }
+                    mqttOpened = 1;
+                    dumpInfo("MQTT open: [SUCCESS]\r\n");
+                }
+                else
+                {
+                    dumpInfo("MQTT open: [FAIL]\r\n");
+                    gsmConnectionStartOver();
                 }
             }
-            break;
-        case CLOSE_A_NETWORK_FOR_MQTT_CLIENT:
-
-            break;
-        case CONNECT_A_CLIENT_TO_MQTT_SERVER:
-            if (tempPacket.atCmdType == READ_COMMAND)
+        }
+        return EXIT_SUCCESS;
+        break;
+    case CLOSE_A_NETWORK_FOR_MQTT_CLIENT:
+        return EXIT_SUCCESS;
+        break;
+    case CONNECT_A_CLIENT_TO_MQTT_SERVER:
+        if (tempPacket.atCmdType == READ_COMMAND)
+        {
+            // IMPLEMENT_IF_NEEDED
+            // if(strstr(rxData.b, "+QMTCONN: 0,3") != NULL) 
+            // {
+            //     dumpInfo("MQTT connection: [ ALREADY CONNECTED ]\r\n");
+            //     mqttConnected = 1;
+            // }
+            return EXIT_SUCCESS;
+        }
+        if (tempPacket.atCmdType == WRITE_COMMAND)
+        {
+            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
             {
-                // IMPLEMENT_IF_NEEDED
-                // if(strstr(rxData.b, "+QMTCONN: 0,3") != NULL) 
-                // {
-                //     dumpInfo("MQTT connection: [ ALREADY CONNECTED ]\r\n");
-                //     mqttConnected = 1;
-                // }
-            }
-            if (tempPacket.atCmdType == WRITE_COMMAND)
+                i = 0;
+                expInfoArgs[i++] = client_idx;
+                expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
+                expInfoArgs[i++] = CONNECTION_ACCEPTED;
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                 {
-                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
-                    {
-                        i = 0;
-                        expInfoArgs[i++] = client_idx;
-                        expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
-                        expInfoArgs[i++] = CONNECTION_ACCEPTED;
-                        if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
-                        {
-                            mqttConnected = 1;
-                            dumpInfo("MQTT connect: [SUCCESS]\r\n");
-                        }
-                        else
-                        {
-                            dumpInfo("MQTT connect: [FAIL]\r\n");
-                            gsmConnectionStartOver();
-                        }
-                    }
+                    mqttConnected = 1;
+                    dumpInfo("MQTT connect: [SUCCESS]\r\n");
+                    return EXIT_SUCCESS;
                 }
-            break;
-        case DISCONNECT_A_CLIENT_FROM_MQTT_SERVER:
-
-            break;
-        case SUBSCRIBE_TO_TOPICS:
-
-            break;
-        case PUBLISH_MESSAGES:
-            if (tempPacket.atCmdType == WRITE_COMMAND)
+                else
+                {
+                    dumpInfo("MQTT connect: [FAIL]\r\n");
+                    gsmConnectionStartOver();
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+        break;
+    case DISCONNECT_A_CLIENT_FROM_MQTT_SERVER:
+        return EXIT_SUCCESS;
+        break;
+    case SUBSCRIBE_TO_TOPICS:
+        return EXIT_SUCCESS;
+        break;
+    case PUBLISH_MESSAGES:
+        if (tempPacket.atCmdType == WRITE_COMMAND)
+        {
+            if(strstr(tempData, ">") != NULL)
             {
-                if(strstr(tempData, ">") != NULL)
+                if (resendPayload == 1)
+                {
+                    mqttInputPayload(payloadData.b);
+                }
+                else
                 {
                     memset(payloadData.b, '\0', sizeof(payloadData.b));
                     if (xQueueReceive(payloadDataQueue, &payloadData, MS_TO_TICKS(200)) == pdTRUE)
                     {
                         mqttInputPayload(payloadData.b);
                     }
-                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+                    else
                     {
-                        if ((strstr(rxData.b, payloadData.b) != NULL) && (strstr(rxData.b, "OK") != NULL))
-                        {
-                            dumpInfo("MQTT payload: [SUCCESS]\r\n");
+                        dumpInfo("Can't input mqtt payload! Not received.\r\n");
+                    }
+                }
 
-                            memset(rxData.b, '\0', sizeof(rxData.b));
-                            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+                if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+                {
+                    if ((strstr(rxData.b, payloadData.b) != NULL) && (strstr(rxData.b, "OK") != NULL))
+                    {
+                        dumpInfo("MQTT payload: [SUCCESS]\r\n");
+
+                        memset(rxData.b, '\0', sizeof(rxData.b));
+                        if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+                        {
+                            i = 0;
+                            expInfoArgs[i++] = client_idx;
+                            expInfoArgs[i++] = QOS1_AT_LEAST_ONCE;
+                            expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
+                            if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                             {
-                                i = 0;
-                                expInfoArgs[i++] = client_idx;
-                                expInfoArgs[i++] = QOS1_AT_LEAST_ONCE;
-                                expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
-                                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
-                                {
-                                    dumpInfo("MQTT publish: [SUCCESS]\r\n");
-                                }
-                                else
-                                {
-                                    dumpInfo("MQTT publish: [FAIL]\r\n");
-                                }
+                                dumpInfo("MQTT publish: [SUCCESS]\r\n");
+                                resendPayload = 0;
+                                return EXIT_SUCCESS;
+                            }
+                            else
+                            {
+                                dumpInfo("MQTT publish: [FAIL]\r\n");
+                                resendPayload = 1;
+                                return EXIT_FAILURE;
                             }
                         }
-                        else
-                        {
-                            dumpInfo("\r\nMQTT payload: [FAIL]\r\n");
-                        }
+                    }
+                    else
+                    {
+                        dumpInfo("\r\nMQTT payload: [FAIL]\r\n");
+                        return EXIT_FAILURE;
                     }
                 }
             }
-            break;
-        default:
-            break;
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+        break;
+    default:
+        dumpDebug("Unknown/Not implemented MQTT command id.\r\n");
+        return EXIT_SUCCESS;
+        break;
     }
+
+    dumpDebug("Failed switch statement!\r\n");
+    return EXIT_FAILURE;
 }
 
 

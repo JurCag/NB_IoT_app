@@ -18,6 +18,6 @@ void BG96_mqttCreatePayloadDataQueue(void);
 void BG96_mqttQueuePayloadData(PayloadData_t pubData);
 
 void BG96_checkIfConnectedToMqttServer(void);
-void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data);
+uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data);
 
 #endif // __BG96_MQTT_H__

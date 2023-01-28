@@ -57,7 +57,7 @@ static void queueRxData(RxData_t rxData);
 static void startGatheringSensorData(void);
 
 static uint8_t responseParser(void);
-static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
+static uint8_t BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
 
 void BG96_txStr(char* str)
 {
@@ -378,62 +378,6 @@ static void taskMqttPubData(void* pvParameters)
     }
 }
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-static void taskTestNbiotDatarate(void *pvParameters)
-{
-    static SensorData_t sensorData;
-
-    dumpDebug("START TEST NBIOT UPLOAD DATARATE\r\n");
-    TASK_DELAY_MS(4000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(sensorData);
-    }
-    dumpDebug("FINISH TEST NBIOT UPLOAD DATARATE\r\n");
-    vTaskDelete(NULL);
-}
-#endif
-
 static void taskTx(void *pvParameters)
 {
     static int8_t parserResult = -1;
@@ -478,8 +422,7 @@ static uint8_t responseParser(void)
             if (strstr(rxData.b, deqdAtPacket.atCmd.confirmation) != NULL)
             {
                 dumpInfo("Response: [OK]\r\n");
-                BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
-                return EXIT_SUCCESS;
+                return (BG96_atCmdFamilyParser(&deqdAtPacket, &rxData));
             }
             else if(strstr(rxData.b, deqdAtPacket.atCmd.error) != NULL)
             {
@@ -488,16 +431,18 @@ static uint8_t responseParser(void)
             }
             else if (strstr(rxData.b, ">") != NULL) // First check if it is waiting for input data
             {
-                BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
-                return EXIT_SUCCESS;
+                // BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
+                // return EXIT_SUCCESS;
+                return (BG96_atCmdFamilyParser(&deqdAtPacket, &rxData));
             }
             else if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd.maxRespTime_ms)) == pdTRUE) // otherwise it will be waiting here for the maxRespTime_ms
             {
                 if (strstr(rxData.b, deqdAtPacket.atCmd.confirmation) != NULL)
                 {
                     dumpInfo("Response: [LATE OK]\r\n");
-                    BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
-                    return EXIT_SUCCESS;
+                    return (BG96_atCmdFamilyParser(&deqdAtPacket, &rxData));
+                    // BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
+                    // return EXIT_SUCCESS;
                 }
                 else if(strstr(rxData.b, deqdAtPacket.atCmd.error) != NULL)
                 {
@@ -521,23 +466,39 @@ static uint8_t responseParser(void)
     return EXIT_FAILURE;
 }
 
-static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data)
+static uint8_t BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data)
 {
     switch(atPacket->atCmd.family)
     {
+        case GENERAL_COMMANDS:
+            return EXIT_SUCCESS;
+            break;
+        case SIM_RELATED_COMMANDS:
+            return EXIT_SUCCESS;
+            break;
         case NETWORK_SERVICE_COMMANDS:
             // IMPLEMENT_IF_NEEDED: BG96_networkResponseParser(atPacket, data->b);
+            return EXIT_SUCCESS;
+            break;
+        case PACKET_DOMAIN_COMMANDS:
+            return EXIT_SUCCESS;
+            break;
+        case HARDWARE_RELATED_COMMANDS:
+            return EXIT_SUCCESS;
             break;
         case SSL_RELATED_AT_COMMANDS:
             // IMPLEMENT_IF_NEEDED: BG96_sslResponseParser(atPacket, data->b);
+            return EXIT_SUCCESS;
             break;
         case TCPIP_RELATED_AT_COMMANDS:
-            BG96_tcpipResponseParser(atPacket, data->b);
+            return (BG96_tcpipResponseParser(atPacket, data->b));
             break;
         case MQTT_RELATED_AT_COMMANDS:
-            BG96_mqttResponseParser(atPacket, data->b);
+            return (BG96_mqttResponseParser(atPacket, data->b));
             break;
         default:
+            dumpDebug("Unknown/Not implemented AT command family.\r\n");
+            return EXIT_SUCCESS;
             break;
     }
 }
@@ -714,10 +675,6 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
     arg[strlen(arg)-1] = '\0';
 }
 
-// TODO: create function like this:
-// It will be filling the queuePayloadData and on the backgorund there should
-// be som task that sends the data from the queue to the AWS cloud
-// it is already in taskFeedTxQueue in "case SENDING_SENSOR_DATA:"
 void BG96_sendMqttData(SensorData_t data)
 {
     if (taskMqttPubDataHandle != NULL)
@@ -730,6 +687,62 @@ void BG96_sendMqttData(SensorData_t data)
         dumpInfo("Can't notify non-existing task!\r\n");
     }
 }
+
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+static void taskTestNbiotDatarate(void *pvParameters)
+{
+    static SensorData_t sensorData;
+
+    dumpDebug("START TEST NBIOT UPLOAD DATARATE\r\n");
+    TASK_DELAY_MS(4000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d", i%10);
+        dumpDebug(sensorData.b);
+        BG96_sendMqttData(sensorData);
+    }
+    TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d", i%10);
+        dumpDebug(sensorData.b);
+        BG96_sendMqttData(sensorData);
+    }
+    TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d", i%10);
+        dumpDebug(sensorData.b);
+        BG96_sendMqttData(sensorData);
+    }
+    TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d", i%10);
+        dumpDebug(sensorData.b);
+        BG96_sendMqttData(sensorData);
+    }
+    TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    for (uint8_t i = 0; i < 12; i++)
+    {
+        memset(sensorData.b, '\0', sizeof(sensorData.b));
+        sprintf(sensorData.b, "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d", i%10);
+        dumpDebug(sensorData.b);
+        BG96_sendMqttData(sensorData);
+    }
+    dumpDebug("FINISH TEST NBIOT UPLOAD DATARATE\r\n");
+    vTaskDelete(NULL);
+}
+#endif
 
 void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn)
 {

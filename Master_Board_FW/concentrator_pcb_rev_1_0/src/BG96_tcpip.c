@@ -25,7 +25,7 @@ void BG96_tcpipConfigParams(void)
 
 }
 
-void BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
+uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
 {
     BG96_AtPacket_t tempPacket;
     char tempData[BUFFER_SIZE];
@@ -36,23 +36,30 @@ void BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
     switch (tempPacket.atCmd.id)
     {
         case CONFIGURE_PARAMETERS_OF_A_TCPIP_CONTEXT:
-
+            return EXIT_SUCCESS;
             break;
         case ACTIVATE_A_PDP_CONTEXT:
             if (tempPacket.atCmdType == WRITE_COMMAND)
             {
                 dumpInfo("PDP Context: [ACTIVATED]\r\n");
                 pdpContextActivated = 1;
+                return EXIT_SUCCESS;
             }
+            return EXIT_SUCCESS;
             break;
         case DEACTIVATE_A_PDP_CONTEXT:
             if (tempPacket.atCmdType == WRITE_COMMAND)
             {
                 dumpInfo("PDP Context: [DEACTIVATED]\r\n");
                 pdpContextActivated = 0;
+                return EXIT_SUCCESS;
             }
+            return EXIT_SUCCESS;
             break;
         default:
+            dumpDebug("Unknown/Not implemented TCPIP command id.\r\n");
+            return EXIT_SUCCESS;
             break;
     }
+    return EXIT_FAILURE;
 }

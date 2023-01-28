@@ -7,7 +7,7 @@
 
 void BG96_tcpipConfigParams(void);
 
-void BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data);
+uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data);
 
 
 #endif // __BG96_TCPIP_H__
