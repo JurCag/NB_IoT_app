@@ -31,7 +31,7 @@ void app_main()
 
         /* Initialize FreeRTOS components */
         createRxDataQueue();
-        createAtPacketsTxQueue();
+        createAtPacketsTxQueues();
 
         TASK_DELAY_MS(1000);
 

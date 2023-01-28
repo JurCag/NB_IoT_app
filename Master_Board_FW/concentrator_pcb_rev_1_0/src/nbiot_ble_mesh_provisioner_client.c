@@ -668,7 +668,7 @@ static void sensorClientCB(esp_ble_mesh_sensor_client_cb_event_t event,
     
     if (event != ESP_BLE_MESH_SENSOR_CLIENT_TIMEOUT_EVT)
     {
-        printf("RECEIVED RESPONSE\n");
+        ESP_LOGI(tag, "RECEIVED RESPONSE FROM SERVER NODE");
         resetNodeTimeoutCnt(node->unicast_addr);
     }
         

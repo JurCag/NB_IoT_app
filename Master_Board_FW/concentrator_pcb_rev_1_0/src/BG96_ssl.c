@@ -33,7 +33,6 @@ void BG96_sslConfigParams(void)
     paramsArr[idx++] = (void*) client_key_path;
     prepAtCmdArgs(AT_configureParametersOfSSLContext.arg, paramsArr, idx);
     queueAtPacket(&AT_configureParametersOfSSLContext, WRITE_COMMAND); 
-    
 
     idx = 0;
     paramsArr[idx++] = (void*) "\"ciphersuite\"";

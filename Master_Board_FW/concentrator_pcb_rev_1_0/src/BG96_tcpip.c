@@ -33,7 +33,7 @@ void BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
     memcpy(&tempPacket, packet, sizeof(BG96_AtPacket_t));
     memcpy(tempData, data, BUFFER_SIZE);
 
-    switch (tempPacket.atCmd->id)
+    switch (tempPacket.atCmd.id)
     {
         case CONFIGURE_PARAMETERS_OF_A_TCPIP_CONTEXT:
 

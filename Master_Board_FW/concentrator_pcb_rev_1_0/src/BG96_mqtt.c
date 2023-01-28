@@ -18,12 +18,11 @@ TimerHandle_t timerPubData = NULL;
 static void timerPubDataCB(TimerHandle_t xTimer);
 static uint8_t timerPubDataExpired = 0;
 
-static QueueHandle_t payloadDataQueue = NULL;
 #define PAYLOAD_DATA_QUEUE_LENGTH       (20)
 #define PAYLOAD_DATA_QUEUE_ITEM_SIZE    (sizeof(PayloadData_t))
-static StaticQueue_t xStaticQueue;
-uint8_t ucQueueStorageArea[ PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE ];
- 
+static StaticQueue_t payloadDataStaticQueue;
+static uint8_t payloadDataQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE];
+static QueueHandle_t payloadDataQueue = NULL;
 
 void BG96_checkIfConnectedToMqttServer(void)
 {
@@ -124,11 +123,11 @@ static void timerConnToServerCB(TimerHandle_t xTimer)
 
 void BG96_mqttCreatePayloadDataQueue(void)
 {
-    // Stored in RAM - queue is allocated during compilation
+    // Stored in RAM - allocated during compilation
     payloadDataQueue = xQueueCreateStatic(PAYLOAD_DATA_QUEUE_LENGTH,
                                           PAYLOAD_DATA_QUEUE_ITEM_SIZE,
-                                          ucQueueStorageArea,
-                                          &xStaticQueue);
+                                          payloadDataQueueStorageArea,
+                                          &payloadDataStaticQueue);
 }
 
 void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
@@ -157,6 +156,9 @@ void BG96_mqttPubQueuedData(void)
     static uint8_t retain = 0;
     static char* mqttTopic = "\"BG96_demoThing/sensors\"";
 
+    // The timer is here to ensure that the mqtt connection is established before publish data
+    // E.g. the mqtt open and conn commands were sent and imidiately afterwards the qmtpub is sent
+    // the connection might be yet not opened and cmd will fail.
     if ((mqttOpened == 0) && (mqttConnected == 0))
     {
         dumpDebug("timerPubData: [CREATE A]\r\n");
@@ -178,8 +180,9 @@ void BG96_mqttPubQueuedData(void)
                       timerPubDataCB);              // Callback function
     }
 
-    if (timerPubData != NULL)
+    if ((timerPubData != NULL) && (mqttConnected == 0))
     {
+        dumpDebug("timerPubData: [START]\r\n");
         xTimerStart(timerPubData, MS_TO_TICKS(10));
     }
 
@@ -240,7 +243,7 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
     memcpy(&tempPacket, packet, sizeof(BG96_AtPacket_t));
     memcpy(tempData, data, BUFFER_SIZE);
 
-    switch (tempPacket.atCmd->id)
+    switch (tempPacket.atCmd.id)
     {
         case CONFIGURE_OPTIONAL_PARAMETERS_OF_MQTT:
 
@@ -248,12 +251,12 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
         case OPEN_A_NETWORK_CONNECTION_FOR_MQTT_CLIENT:
             if (tempPacket.atCmdType == WRITE_COMMAND)
             {
-                if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd->maxRespTime_ms)) == pdTRUE)
+                if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
                 {
                     i = 0;
                     expInfoArgs[i++] = client_idx;
                     expInfoArgs[i++] = NETWORK_OPENED_SUCCESSFULLY;
-                    if (isInfoResponseCorrect(rxData.b, tempPacket.atCmd, expInfoArgs, i) == EXIT_SUCCESS)
+                    if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                     {
                         mqttOpened = 1;
                         dumpInfo("MQTT open: [SUCCESS]\r\n");
@@ -281,13 +284,13 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
             }
             if (tempPacket.atCmdType == WRITE_COMMAND)
                 {
-                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd->maxRespTime_ms)) == pdTRUE)
+                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
                     {
                         i = 0;
                         expInfoArgs[i++] = client_idx;
                         expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
                         expInfoArgs[i++] = CONNECTION_ACCEPTED;
-                        if (isInfoResponseCorrect(rxData.b, tempPacket.atCmd, expInfoArgs, i) == EXIT_SUCCESS)
+                        if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                         {
                             mqttConnected = 1;
                             dumpInfo("MQTT connect: [SUCCESS]\r\n");
@@ -316,20 +319,20 @@ void BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                     {
                         mqttInputPayload(payloadData.b);
                     }
-                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd->maxRespTime_ms)) == pdTRUE)
+                    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
                     {
                         if ((strstr(rxData.b, payloadData.b) != NULL) && (strstr(rxData.b, "OK") != NULL))
                         {
                             dumpInfo("MQTT payload: [SUCCESS]\r\n");
 
                             memset(rxData.b, '\0', sizeof(rxData.b));
-                            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd->maxRespTime_ms)) == pdTRUE)
+                            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
                             {
                                 i = 0;
                                 expInfoArgs[i++] = client_idx;
                                 expInfoArgs[i++] = QOS1_AT_LEAST_ONCE;
                                 expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
-                                if (isInfoResponseCorrect(rxData.b, tempPacket.atCmd, expInfoArgs, i) == EXIT_SUCCESS)
+                                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                                 {
                                     dumpInfo("MQTT publish: [SUCCESS]\r\n");
                                 }

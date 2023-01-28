@@ -26,17 +26,17 @@
 #define UART_ESPxBG96               (UART_NUM_2)
 
 #define NOTIF_MASK(taskIdBit)       (1 << taskIdBit)
-
 #define BG96_HOLD_POWER_UP_PIN_MS   (750) 
-
-#define RESEND_ATTEMPTS                 (4)
-#define WAITING_FOR_SECONDARY_RESPONSE  (2)
+#define RESEND_ATTEMPTS             (4)
 
 /* Uncomment to gather data from sensor boards through BLE even if GSM modem not present */
-#define DEBUG_SENSOR_DATA_GATHERING
+// #define DEBUG_SENSOR_DATA_GATHERING
 
 /* Uncomment to test upload datarate of NB IoT by sending random byte fixed-length payloads */
 // #define TEST_NBIOT_UPLOAD_DATARATE
+
+/* Uncomment to test mqtt publish cmd (sends one payload after initialization) */
+#define TEST_MQTT_PUBLISH
 
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
@@ -49,24 +49,6 @@
 
 /* Typedefs */ 
 typedef void (*BG96_startGatheringSensorDataCB_t)(void);
-
-typedef enum
-{
-    IDLE                = 0,
-    INITIALIZATION      = 1,
-    SENDING_SENSOR_DATA = 2
-} FeedTxQueueState_t;
-
-// configTASK_NOTIFICATION_ARRAY_ENTRIES must be higher than 1
-// to use more notif indexes
-// ulTaskNotifyGiveIndexed(0, ) is the same sa not indexed ulTaskNotifyGive()
-typedef enum
-{
-    NOTIF_INDEX_0   = 0, 
-    NOTIF_INDEX_1   = 1,
-    NOTIF_INDEX_2   = 2,
-    NOTIF_INDEX_3   = 3
-} NotificationIndex_t;
 
 /* Variables */
 ContextID_t contextID;
@@ -89,12 +71,10 @@ void createTaskPowerUpModem(gpio_num_t pwrKeyPin);
 void createTaskFeedTxQueue(void);
 
 void createRxDataQueue(void);
-void createAtPacketsTxQueue(void);
+void createAtPacketsTxQueues(void);
 
 void dumpInterComm(char* str);
 void dumpInfo(char* str);
 void dumpDebug(char* str);
-
-// void createTaskTest(void);
 
 #endif // __BG96_H__

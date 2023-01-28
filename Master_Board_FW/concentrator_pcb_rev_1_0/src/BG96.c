@@ -1,6 +1,6 @@
 #include "BG96.h"
 
-#define UART_FULL_THRESH_DEFAULT        (120) // this is the macro from platformio\packages\framework-espidf\components\driver\uart.c
+#define UART_FULL_THRESH_DEFAULT        (120) // macro from platformio\packages\framework-espidf\components\driver\uart.c
 
 // Common indexes for this connection/application (BG96 can theoretically open more connections to the GSM network)
 ContextID_t contextID = CONTEXT_ID_1;
@@ -18,10 +18,17 @@ QueueHandle_t rxDataQueue = NULL;
 static BG96_AtPacket_t deqdAtPacket;
 static char lastSentAtCmdStr[BUFFER_SIZE];
 static QueueHandle_t atPacketsTxQueue = NULL;
+#define AT_PACKETS_TX_SCHEDULER_QUEUE_LENGTH            (40)
+#define AT_PACKETS_TX_SCHEDULER_QUEUE_ITEM_SIZE         (sizeof(BG96_AtPacket_t))
+static StaticQueue_t atPacketsTxSchedulerStaticQueue;
+static uint8_t atPacketsTxSchedulerQueueStorageArea[AT_PACKETS_TX_SCHEDULER_QUEUE_LENGTH * AT_PACKETS_TX_SCHEDULER_QUEUE_ITEM_SIZE];
+static QueueHandle_t atPacketsTxSchedulerQueue = NULL;
 static TaskHandle_t taskRxHandle = NULL;
 static TaskHandle_t taskTxHandle = NULL;
 static TaskHandle_t taskPowerUpModemHandle = NULL;
 static TaskHandle_t taskFeedTxQueueHandle = NULL;
+static TaskHandle_t taskMqttPubDataHandle = NULL;
+static TaskHandle_t taskAtPacketTxSchedulerHandle = NULL;
 static BG96_startGatheringSensorDataCB_t startGatheringSensorDataCB = NULL;
 
 /* Local FreeRTOS tasks */
@@ -29,14 +36,17 @@ static void taskRx(void* pvParameters);
 static void taskTx(void *pvParameters);
 static void taskPowerUpModem(void *pvParameters);
 static void taskFeedTxQueue(void* pvParameters);
+static void taskMqttPubData(void* pvParameters);
+static void taskAtPacketTxScheduler(void* pvParameters);
+
+static void createTaskMqttPubData(void);
+static void createTaskAtPacketTxScheduler(void);
 
 #ifdef TEST_NBIOT_UPLOAD_DATARATE
-static TaskHandle_t taskTestNbiotLimitsHandle = NULL;
-static void taskTestNbiotLimits(void* pvParameters);
-static void createTaskTestNbiotLimits(void);
+static TaskHandle_t taskTestNbiotDatarateHandle = NULL;
+static void taskTestNbiotDatarate(void* pvParameters);
+static void createTaskTestNbiotDatarate(void);
 #endif
-
-// static void taskTest(void *pvParameters);
 
 /* Local functions */
 static void BG96_sendAtPacket(BG96_AtPacket_t* atPacket);
@@ -77,7 +87,7 @@ static void BG96_buildAtCmdStr(BG96_AtPacket_t* atPacket, char* atCmdStr, const 
     memset(atCmdStr, '\0', atCmdStrMaxLen);
 
     strcpy(atCmdStr, "AT");
-    strcat(atCmdStr, atPacket->atCmd->cmd);
+    strcat(atCmdStr, atPacket->atCmd.cmd);
     
     switch(atPacket->atCmdType)
     {
@@ -89,7 +99,7 @@ static void BG96_buildAtCmdStr(BG96_AtPacket_t* atPacket, char* atCmdStr, const 
             break;
         case WRITE_COMMAND:
             strcat(atCmdStr, "=");
-            strcat(atCmdStr, atPacket->atCmd->arg);
+            strcat(atCmdStr, atPacket->atCmd.arg);
             strcat(atCmdStr, "\r\n");
             break;
         case EXECUTION_COMMAND:
@@ -149,16 +159,40 @@ void createTaskFeedTxQueue(void)
                 );
 }
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-static void createTaskTestNbiotLimits(void)
+static void createTaskAtPacketTxScheduler(void)
 {
     xTaskCreate(
-                taskTestNbiotLimits,                /* Task function */
-                "taskTestNbiotLimits",              /* Name of task */
+                taskAtPacketTxScheduler,        /* Task function */
+                "taskAtPacketTxScheduler",      /* Name of task */
+                8192,                           /* Stack size of task */
+                NULL,                           /* Parameter of the task */
+                tskIDLE_PRIORITY + 2,           /* Priority of the task */
+                &taskAtPacketTxSchedulerHandle       /* Handle of created task */
+                );
+}
+
+static void createTaskMqttPubData(void)
+{
+    xTaskCreate(
+                taskMqttPubData,                /* Task function */
+                "taskMqttPubData",              /* Name of task */
+                2048,                           /* Stack size of task */
+                NULL,                           /* Parameter of the task */
+                tskIDLE_PRIORITY + 1,           /* Priority of the task */
+                &taskMqttPubDataHandle          /* Handle of created task */
+                );
+}
+
+#ifdef TEST_NBIOT_UPLOAD_DATARATE
+static void createTaskTestNbiotDatarate(void)
+{
+    xTaskCreate(
+                taskTestNbiotDatarate,          /* Task function */
+                "taskTestNbiotDatarate",        /* Name of task */
                 8192,                           /* Stack size of task */
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 1,           /* Priority of the task */
-                &taskTestNbiotLimitsHandle          /* Handle of created task */
+                &taskTestNbiotDatarateHandle    /* Handle of created task */
                 );
 }
 #endif
@@ -169,9 +203,15 @@ void createRxDataQueue(void)
     rxDataQueue = xQueueCreate(1, sizeof(RxData_t));
 }
 
-void createAtPacketsTxQueue(void)
+void createAtPacketsTxQueues(void)
 {
     atPacketsTxQueue = xQueueCreate(10, sizeof(BG96_AtPacket_t));
+
+    // Stored in RAM - allocated during compilation
+    atPacketsTxSchedulerQueue = xQueueCreateStatic(AT_PACKETS_TX_SCHEDULER_QUEUE_LENGTH,
+                                                AT_PACKETS_TX_SCHEDULER_QUEUE_ITEM_SIZE,
+                                                atPacketsTxSchedulerQueueStorageArea,
+                                                &atPacketsTxSchedulerStaticQueue);
 }
 
 /* FreeRTOS tasks */
@@ -184,7 +224,8 @@ static void taskPowerUpModem(void *pvParameters)
     static RxData_t rxData;
     BG96_AtPacket_t atPacket;
 
-    atPacket.atCmd = &AT_setCommandEchoMode;
+    // atPacket.atCmd = &AT_setCommandEchoMode;
+    memcpy(&(atPacket.atCmd), &AT_setCommandEchoMode, sizeof(AtCmd_t));
     atPacket.atCmdType = EXECUTION_COMMAND;
 
     dumpInfo("\r\nCheck if modem is powered.\r\n");
@@ -215,7 +256,8 @@ static void taskPowerUpModem(void *pvParameters)
 #ifdef RESTART_BG96
     if (modemPowerOn == 1)
     {
-        atPacket.atCmd = &AT_powerDown;
+        // atPacket.atCmd = &AT_powerDown;
+        memcpy(&(atPacket.atCmd), &AT_powerDown, sizeof(AtCmd_t));
         atPacket.atCmdType = WRITE_COMMAND;
         dumpInfo("\r\nModem power-down: [STARTED]\r\n");
         i = 0;
@@ -257,6 +299,7 @@ static void taskPowerUpModem(void *pvParameters)
                 if (strstr(rxData.b, "APP RDY") != NULL)
                 {
                     dumpInfo("Modem power-up: [SUCCESS]\r\n");
+                    createTaskAtPacketTxScheduler();
                     createTaskFeedTxQueue();
                     break;
                 }
@@ -267,6 +310,9 @@ static void taskPowerUpModem(void *pvParameters)
                 dumpInfo("Modem power-up: [FAIL]\r\n");
 #ifdef DEBUG_SENSOR_DATA_GATHERING
                 startGatheringSensorData();
+#else
+                dumpInfo("RESTARTING ESP due to power up fail.\r\n");
+                esp_restart();
 #endif
                 break;
             }
@@ -278,133 +324,112 @@ static void taskPowerUpModem(void *pvParameters)
 
 static void taskFeedTxQueue(void* pvParameters)
 {
-    static FeedTxQueueState_t taskState = INITIALIZATION;
     static SensorData_t sensorData;
+#ifdef TEST_MQTT_PUBLISH
     char payload1[BUFFER_SIZE] = "{ \"sensorName\" : \"TEST SENSOR\", \"data\" : 123456}";
-    static uint32_t notifValue;
+#endif
 
     createTaskTx();
-    TASK_DELAY_MS(4000); // give BG96 time to connect to GSM network
+    TASK_DELAY_MS(4000); // time for BG96 to connect to GSM network
 
-    while(1)
-    {
-        switch(taskState)
-        {
-            case INITIALIZATION:
-                queueAtPacket(&AT_setCommandEchoMode, EXECUTION_COMMAND);
-                queueAtPacket(&AT_enterPIN, READ_COMMAND);
-                queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-                queueAtPacket(&AT_networkRegistrationStatus, READ_COMMAND);
-                queueAtPacket(&AT_attachmentOrDetachmentOfPS, READ_COMMAND);
-                
-                // BG96_checkIfConnectedToMqttServer();
+    // GSM initialization
+    queueAtPacket(&AT_setCommandEchoMode, EXECUTION_COMMAND);
+    queueAtPacket(&AT_enterPIN, READ_COMMAND);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+    queueAtPacket(&AT_networkRegistrationStatus, READ_COMMAND);
+    queueAtPacket(&AT_attachmentOrDetachmentOfPS, READ_COMMAND);
+    
+    // Configuration
+    BG96_sslConfigParams();
+    BG96_mqttConfigParams();
+    BG96_tcpipConfigParams();
 
-                BG96_sslConfigParams();
-                BG96_mqttConfigParams();
-                BG96_tcpipConfigParams();
+    // Mqtt connection
+    BG96_mqttOpenConn();
+    BG96_mqttConnToServer();
+    BG96_mqttCreatePayloadDataQueue();
+#ifdef TEST_MQTT_PUBLISH
+    memset(sensorData.b, '\0', sizeof(sensorData.b));
+    memcpy(sensorData.b, payload1, strlen(payload1));
+    BG96_mqttQueuePayloadData(sensorData);
+    BG96_mqttPubQueuedData();
+#endif
 
-                BG96_mqttOpenConn();
-                BG96_mqttConnToServer();
-
-                BG96_mqttCreatePayloadDataQueue();
-
-                // TODO: Remove this part (just for testing)
-                memset(sensorData.b, '\0', sizeof(sensorData.b));
-                memcpy(sensorData.b, payload1, strlen(payload1));
-                BG96_mqttQueuePayloadData(sensorData);
-                BG96_mqttPubQueuedData();
-
-                // createTaskForwardSensorData();
-                taskState = SENDING_SENSOR_DATA;
-                
-                break;
-            case SENDING_SENSOR_DATA:
-                dumpDebug("Ready to receive sensor data\r\n");
+    // Sensor data gathering and comm over mqtt
+    dumpDebug("Ready to receive sensor data\r\n");
+    createTaskMqttPubData();
+    startGatheringSensorData();
 
 #ifdef TEST_NBIOT_UPLOAD_DATARATE
-                createTaskTestNbiotLimits();
-#else
-                startGatheringSensorData();
+    createTaskTestNbiotDatarate();
 #endif
-                while(1)
-                {
-                    // React's only to one index (notifs with other index leaves pending)
-                    if ((notifValue = ulTaskNotifyTakeIndexed(NOTIF_INDEX_2, pdFALSE, MS_TO_TICKS(1000))) > 0)
-                    {
-                        BG96_mqttPubQueuedData();
-                    }
-                }
-                break;
-            default:
-                break;
+
+    vTaskDelete(NULL);
+}
+
+static void taskMqttPubData(void* pvParameters)
+{
+    while(1)
+    {
+        if (ulTaskNotifyTake(pdFALSE, MS_TO_TICKS(1000)) > 0)
+        {
+            BG96_mqttPubQueuedData();
         }
-        TASK_DELAY_MS(100);
     }
 }
 
 #ifdef TEST_NBIOT_UPLOAD_DATARATE
-static void taskTestNbiotLimits(void *pvParameters)
+static void taskTestNbiotDatarate(void *pvParameters)
 {
     static SensorData_t sensorData;
-    /* PIN SPOT: Test limits of NB IoT network
-    * 32   Bytes: "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d"
-    * 128  Bytes: "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d"
-    * 256  Bytes: "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d"
-    * 512  Bytes: "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d"
-    * 1024 Bytes: "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d"
-    */
-    dumpDebug("Delay START\r\n");
+
+    dumpDebug("START TEST NBIOT UPLOAD DATARATE\r\n");
     TASK_DELAY_MS(4000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
     for (uint8_t i = 0; i < 12; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "TdlLT4z51xCHBir1hlUqFp420YyRyw:%d", i%10);
-        dumpDebug("NEXT");
         dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        BG96_sendMqttData(sensorData);
     }
     TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
     for (uint8_t i = 0; i < 12; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "Ap0vigXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv:%d", i%10);
-        dumpDebug("NEXT");
         dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        BG96_sendMqttData(sensorData);
     }
     TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
     for (uint8_t i = 0; i < 12; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "AQ7KGKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c:%d", i%10);
-        dumpDebug("NEXT");
         dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        BG96_sendMqttData(sensorData);
     }
     TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
     for (uint8_t i = 0; i < 12; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "Dp8wSnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae:%d", i%10);
-        dumpDebug("NEXT");
         dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        BG96_sendMqttData(sensorData);
     }
     TASK_DELAY_MS(7000);
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
     for (uint8_t i = 0; i < 12; i++)
     {
         memset(sensorData.b, '\0', sizeof(sensorData.b));
         sprintf(sensorData.b, "Im2rTLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp:%d", i%10);
-        dumpDebug("NEXT");
         dumpDebug(sensorData.b);
-        BG96_mqttQueuePayloadData(sensorData);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        BG96_sendMqttData(sensorData);
     }
-    dumpDebug("FINISH\r\n");
+    dumpDebug("FINISH TEST NBIOT UPLOAD DATARATE\r\n");
     vTaskDelete(NULL);
 }
 #endif
@@ -419,11 +444,11 @@ static void taskTx(void *pvParameters)
     {
         if (xQueueReceive(atPacketsTxQueue, &deqdAtPacket, MS_TO_TICKS(200)) == pdTRUE)
         {
-            for(uint8_t sendAttempt = 0; sendAttempt < deqdAtPacket.atCmd->maxResendAttemps; sendAttempt++)
+            for(uint8_t sendAttempt = 0; sendAttempt < deqdAtPacket.atCmd.maxResendAttemps; sendAttempt++)
             {
                 if (sendAttempt > 0)
                 {
-                    sprintf(resendAttemptsStr, "Resend attempt: [%d/%d] %s\r\n", (sendAttempt + 1), deqdAtPacket.atCmd->maxResendAttemps, deqdAtPacket.atCmd->cmd);
+                    sprintf(resendAttemptsStr, "Resend attempt: [%d/%d] %s\r\n", (sendAttempt + 1), deqdAtPacket.atCmd.maxResendAttemps, deqdAtPacket.atCmd.cmd);
                     dumpInfo(resendAttemptsStr);
                 }
 
@@ -431,8 +456,7 @@ static void taskTx(void *pvParameters)
                 parserResult = responseParser();
                 if (parserResult == EXIT_SUCCESS)
                 {
-                    // Notif that cmd sent
-                    xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_1);
+                    xTaskNotifyGive(taskAtPacketTxSchedulerHandle);
                     break;
                 }
             }
@@ -443,23 +467,21 @@ static void taskTx(void *pvParameters)
 static uint8_t responseParser(void)
 {
     static RxData_t rxData;
-    // static char sentCmdStr[BUFFER_SIZE];
 
-    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd->maxRespTime_ms)) == pdTRUE)
+    if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd.maxRespTime_ms)) == pdTRUE)
     {
-        // BG96_buildAtCmdStr(&lastSentAtPacket, sentCmdStr, BUFFER_SIZE);
         lastSentAtCmdStr[strlen(lastSentAtCmdStr)-1] = '\0';    // remove '\n'
         lastSentAtCmdStr[strlen(lastSentAtCmdStr)-1] = '\0';    // and remove '\r', otherwise might not match the response
 
         if (strstr(rxData.b, lastSentAtCmdStr) != NULL) // or does the response matches exactly the cmd that was sent
         {
-            if (strstr(rxData.b, deqdAtPacket.atCmd->confirmation) != NULL)
+            if (strstr(rxData.b, deqdAtPacket.atCmd.confirmation) != NULL)
             {
                 dumpInfo("Response: [OK]\r\n");
                 BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
                 return EXIT_SUCCESS;
             }
-            else if(strstr(rxData.b, deqdAtPacket.atCmd->error) != NULL)
+            else if(strstr(rxData.b, deqdAtPacket.atCmd.error) != NULL)
             {
                 dumpInfo("Response: [ERROR]\r\n");
                 return EXIT_FAILURE;
@@ -469,15 +491,15 @@ static uint8_t responseParser(void)
                 BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
                 return EXIT_SUCCESS;
             }
-            else if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd->maxRespTime_ms)) == pdTRUE) // otherwise it will be waiting here for the maxRespTime_ms
+            else if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd.maxRespTime_ms)) == pdTRUE) // otherwise it will be waiting here for the maxRespTime_ms
             {
-                if (strstr(rxData.b, deqdAtPacket.atCmd->confirmation) != NULL)
+                if (strstr(rxData.b, deqdAtPacket.atCmd.confirmation) != NULL)
                 {
                     dumpInfo("Response: [LATE OK]\r\n");
                     BG96_atCmdFamilyParser(&deqdAtPacket, &rxData);
                     return EXIT_SUCCESS;
                 }
-                else if(strstr(rxData.b, deqdAtPacket.atCmd->error) != NULL)
+                else if(strstr(rxData.b, deqdAtPacket.atCmd.error) != NULL)
                 {
                     dumpInfo("Response: [LATE ERROR]\r\n");
                     return EXIT_FAILURE;
@@ -501,7 +523,7 @@ static uint8_t responseParser(void)
 
 static void BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data)
 {
-    switch(atPacket->atCmd->family)
+    switch(atPacket->atCmd.family)
     {
         case NETWORK_SERVICE_COMMANDS:
             // IMPLEMENT_IF_NEEDED: BG96_networkResponseParser(atPacket, data->b);
@@ -576,40 +598,91 @@ static void swPowerDownModem(void)
 static void queueRxData(RxData_t rxData)
 {
     if (rxDataQueue != NULL)
-        xQueueSend(rxDataQueue, rxData.b, 10);
+    {
+        if (xQueueSend(rxDataQueue, rxData.b, MS_TO_TICKS(10)) != pdTRUE)
+        {
+            dumpInfo("Receive Data Queue is full");
+        }
+    }
     else
-        dumpInfo("Receive Data Queue not created!\r\n");
+    {
+        dumpInfo("Receive Data Queue was not created!\r\n");
+    }
 }
 
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t cmdType)
 {
-    BG96_AtPacket_t xAtPacket;
+    BG96_AtPacket_t tmpAtPacket;
+
+    memset(&tmpAtPacket, 0, sizeof(BG96_AtPacket_t));
+    memcpy(&(tmpAtPacket.atCmd), cmd, sizeof(AtCmd_t));
+    tmpAtPacket.atCmdType = cmdType;
+
+    if (atPacketsTxSchedulerQueue != NULL)
+    {
+        if (xQueueSend(atPacketsTxSchedulerQueue, &tmpAtPacket, MS_TO_TICKS(1000)) != pdTRUE)
+        {
+            dumpInfo("AT Packets Tx Scheduler Queue is full!");
+        }
+    }
+    else
+    {
+        dumpInfo("AT Packets Tx Scheduler Queue was not created!\r\n");
+    }
+}
+
+static void taskAtPacketTxScheduler(void* pvParameters)
+{
+    static BG96_AtPacket_t tmpAtPacketOut;
     static uint8_t firstAtPacket = 1;
     static const uint16_t timeToProcessResp = 1000;
     static uint32_t waitForRespProcessed = 300;
     static char printMsg[40];
 
-    xAtPacket.atCmd = cmd;
-    xAtPacket.atCmdType = cmdType;
-
-    // React's only to one index (notifs with other index leaves pending)
-    if (ulTaskNotifyTakeIndexed(NOTIF_INDEX_1, pdFALSE, MS_TO_TICKS(waitForRespProcessed)) > 0)
+    while(1)
     {
-        waitForRespProcessed = cmd->maxRespTime_ms + (uint32_t)timeToProcessResp;
-        xQueueSend(atPacketsTxQueue, &xAtPacket, 0);
-    }
-    else if (firstAtPacket == 1)
-    {
-        firstAtPacket = 0;
-        waitForRespProcessed = cmd->maxRespTime_ms + (uint32_t)timeToProcessResp;
-        xQueueSend(atPacketsTxQueue, &xAtPacket, 0);
-    }
-    else
-    {
-        memset(printMsg, '\0', sizeof(printMsg));
-        sprintf(printMsg, "Waiting response to %s: [EXPIRED]\r\n", cmd->cmd);
-        dumpInfo(printMsg);
-    }
+        memset(&tmpAtPacketOut, 0, sizeof(BG96_AtPacket_t));
+        if (xQueueReceive(atPacketsTxSchedulerQueue, &tmpAtPacketOut, MS_TO_TICKS(10)) == pdTRUE)
+        {
+            if (ulTaskNotifyTake(pdFALSE, MS_TO_TICKS(waitForRespProcessed)) > 0)
+            {
+                waitForRespProcessed = tmpAtPacketOut.atCmd.maxRespTime_ms + (uint32_t)timeToProcessResp;
+                if (atPacketsTxQueue != NULL)
+                {
+                    if (xQueueSend(atPacketsTxQueue, &tmpAtPacketOut, 0) != pdTRUE)
+                    {
+                        dumpInfo("AT Packets Tx Queue is full!");
+                    }
+                }
+                else
+                {
+                    dumpInfo("AT Packets Tx Queue was not created!\r\n");
+                }
+            }
+            else if (firstAtPacket == 1)
+            {
+                firstAtPacket = 0;
+                waitForRespProcessed = tmpAtPacketOut.atCmd.maxRespTime_ms + (uint32_t)timeToProcessResp;
+                if (atPacketsTxQueue != NULL)
+                {
+                    if (xQueueSend(atPacketsTxQueue, &tmpAtPacketOut, 0) != pdTRUE)
+                    {
+                        dumpInfo("AT Packets Tx Queue is full!");
+                    }
+                }
+                else
+                {
+                    dumpInfo("AT Packets Tx Queue was not created!\r\n");
+                }
+            }
+            else
+            {
+                memset(printMsg, '\0', sizeof(printMsg));
+                sprintf(printMsg, "Waiting response to %s: [EXPIRED]\r\n", tmpAtPacketOut.atCmd.cmd);
+                dumpInfo(printMsg);
+            }
+        }
+    }    
 }
 
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
@@ -647,13 +720,15 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
 // it is already in taskFeedTxQueue in "case SENDING_SENSOR_DATA:"
 void BG96_sendMqttData(SensorData_t data)
 {
-    if (taskFeedTxQueueHandle != NULL)
+    if (taskMqttPubDataHandle != NULL)
     {
         BG96_mqttQueuePayloadData(data);
-        xTaskNotifyGiveIndexed(taskFeedTxQueueHandle, NOTIF_INDEX_2);
+        xTaskNotifyGive(taskMqttPubDataHandle);
     }
     else
+    {
         dumpInfo("Can't notify non-existing task!\r\n");
+    }
 }
 
 void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn)
@@ -688,30 +763,3 @@ void dumpDebug(char* str)
     UART_writeStr(UART_PC, str);
 #endif
 }
-
-
-
-// void createTaskTest(void)
-// {
-//     xTaskCreate(
-//                 taskTest,        /* Task function */
-//                 "taskTest",      /* Name of task */
-//                 1024,                   /* Stack size of task */
-//                 NULL,                   /* Parameter of the task */
-//                 tskIDLE_PRIORITY+1,     /* Priority of the task */
-//                 NULL                    /* Handle of created task */
-//                 );
-// }
-
-// static void taskTest(void *pvParameters)
-// {
-//     RxData_t response;
-//     while(1)
-//     {
-//         if (xQueueReceive(rxDataQueue, &response, MS_TO_TICKS(20)) == pdTRUE)
-//         {
-//             UART_writeStr(UART_PC, "TEST:");
-//             UART_writeStr(UART_PC, response.b);
-//         }
-//     }   
-// }

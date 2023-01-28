@@ -116,7 +116,7 @@ typedef struct
 
 typedef struct
 {
-    AtCmd_t* atCmd;
+    AtCmd_t atCmd;
     AtCmdType_t atCmdType;
 } BG96_AtPacket_t;
 
