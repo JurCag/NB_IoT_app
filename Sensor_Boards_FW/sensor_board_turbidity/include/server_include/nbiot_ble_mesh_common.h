@@ -14,6 +14,7 @@ typedef enum
     NBIOT_BLE_MESH_PROP_ID_LIGHT_INTENSITY  = 0x00C3,   // 4 bytes - float
     NBIOT_BLE_MESH_PROP_ID_DC_CURRENT       = 0x00C4,   // 4 bytes - float
     NBIOT_BLE_MESH_PROP_ID_CO2_CONCENTRATION= 0x00C5,   // 4 bytes - float
+    NBIOT_BLE_MESH_PROP_ID_TURBIDITY        = 0x00C6,   // 4 bytes - float
 } NbiotBLEMeshProperties_t;
 
 #define NBIOT_MAX_PROP_CNT                  (8)

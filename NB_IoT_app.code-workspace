@@ -22,6 +22,10 @@
 		{
 			"name": "sensor_board_co2",
 			"path": "Sensor_Boards_FW/sensor_board_co2"
+		},
+		{
+			"name": "sensor_board_turbidity",
+			"path": "Sensor_Boards_FW/sensor_board_turbidity"
 		}
 	],
 	"settings": {
@@ -101,7 +105,9 @@
 			"mhz19b.h": "c",
 			"esp_idf_lib_helpers.h": "c",
 			"nbiot_ble_mesh_node_mhz19b.h": "c",
-			"sensor_mhz19b.h": "c"
+			"sensor_mhz19b.h": "c",
+			"nbiot_ble_mesh_node_ts300b.h": "c",
+			"sensor_ts300b.h": "c"
 		}
 	}
 }

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "nbiot_ble_mesh_node_acs712.h": "c",
+        "sensor_acs712.h": "c"
+    }
+}
