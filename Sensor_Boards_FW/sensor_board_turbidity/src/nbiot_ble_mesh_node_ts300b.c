@@ -2,7 +2,7 @@
 
 #define SENSOR_NAME                 ("TS-300B")
 
-NET_BUF_SIMPLE_DEFINE_STATIC(turbiditySensorData, 1);
+NET_BUF_SIMPLE_DEFINE_STATIC(turbiditySensorData, 2);
 
 /* Sensor Property ID based on sensor */
 #define SENSOR_PROPERTY_ID_0        NBIOT_BLE_MESH_PROP_ID_TURBIDITY
@@ -125,17 +125,17 @@ void nbiotBleMeshNodeTs300bMain(void)
 static void updateNodeData(void)
 {
     static const char* tag = "TS300B";
-    static int16_t data;
+    static int16_t turbidity;
     uint8_t i;
 
-    data = sensorTs300bGetTurbidity();
+    turbidity = sensorTs300bGetTurbidity();
 
     // NOTE: Very important to reset the net buffer beffore pushing new data,
     // otherwise it causes unpredictable behaviour.
     i = 0;
     net_buf_simple_reset(&turbiditySensorData);
 
-    net_buf_simple_push_le32(&turbiditySensorData, *(uint16_t*)(&data));
-    ESP_LOGI(tag, "[%s] value: [%d], units [%s]", sensorNbiotSetup[i].propName, data, sensorNbiotSetup[i].mmtUnit);
+    net_buf_simple_add_le16(&turbiditySensorData, *(uint16_t*)(&turbidity));
+    ESP_LOGI(tag, "[%s] value: [%d], units [%s]", sensorNbiotSetup[i].propName, turbidity, sensorNbiotSetup[i].mmtUnit);
 }
 
