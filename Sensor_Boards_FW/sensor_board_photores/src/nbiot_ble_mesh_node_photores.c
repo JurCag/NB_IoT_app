@@ -2,7 +2,7 @@
 
 #define SENSOR_NAME                 ("Photoresistor")
 
-NET_BUF_SIMPLE_DEFINE_STATIC(lightIntensitySensorData, 1);
+NET_BUF_SIMPLE_DEFINE_STATIC(lightIntensitySensorData, 4);
 
 /* Sensor Property ID based on sensor */
 #define SENSOR_PROPERTY_ID_0        NBIOT_BLE_MESH_PROP_ID_LIGHT_INTENSITY

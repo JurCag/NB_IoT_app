@@ -2,7 +2,7 @@
 
 #define SENSOR_NAME                 ("Mhz19b")
 
-NET_BUF_SIMPLE_DEFINE_STATIC(co2SensorData, 1);
+NET_BUF_SIMPLE_DEFINE_STATIC(co2SensorData, 2);
 
 /* Sensor Property ID based on sensor */
 #define SENSOR_PROPERTY_ID_0        NBIOT_BLE_MESH_PROP_ID_CO2_CONCENTRATION

@@ -2,9 +2,9 @@
 
 #define SENSOR_NAME                 ("BME280")
 
-NET_BUF_SIMPLE_DEFINE_STATIC(temperatureSensorData, 1);
-NET_BUF_SIMPLE_DEFINE_STATIC(humiditySensorData, 1);
-NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 1);
+NET_BUF_SIMPLE_DEFINE_STATIC(temperatureSensorData, 4);
+NET_BUF_SIMPLE_DEFINE_STATIC(humiditySensorData, 4);
+NET_BUF_SIMPLE_DEFINE_STATIC(pressureSensorData, 4);
 
 /* Sensor Property ID based on sensor */
 #define SENSOR_PROPERTY_ID_0        NBIOT_BLE_MESH_PROP_ID_TEMPERATURE

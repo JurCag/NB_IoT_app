@@ -26,6 +26,10 @@
 		{
 			"name": "sensor_board_turbidity",
 			"path": "Sensor_Boards_FW/sensor_board_turbidity"
+		},
+		{
+			"name": "sensor_board_ph",
+			"path": "Sensor_Boards_FW/sensor_board_ph"
 		}
 	],
 	"settings": {
@@ -107,7 +111,9 @@
 			"nbiot_ble_mesh_node_mhz19b.h": "c",
 			"sensor_mhz19b.h": "c",
 			"nbiot_ble_mesh_node_ts300b.h": "c",
-			"sensor_ts300b.h": "c"
+			"sensor_ts300b.h": "c",
+			"nbiot_ble_mesh_node_4502c.h": "c",
+			"sensor_4502c.h": "c"
 		}
 	}
 }
