@@ -8,12 +8,14 @@ uint8_t devUUID[ESP_BLE_MESH_OCTET16_LEN];
 
 typedef enum
 {
-    NBIOT_BLE_MESH_PROP_ID_TEMPERATURE      = 0x00C0,   // 4 bytes - float
-    NBIOT_BLE_MESH_PROP_ID_PRESSURE         = 0x00C1,   // 4 bytes - float
-    NBIOT_BLE_MESH_PROP_ID_HUMIDITY         = 0x00C2,   // 4 bytes - float
-    NBIOT_BLE_MESH_PROP_ID_LIGHT_INTENSITY  = 0x00C3,   // 4 bytes - float
-    NBIOT_BLE_MESH_PROP_ID_DC_CURRENT       = 0x00C4,   // 4 bytes - float
-    NBIOT_BLE_MESH_PROP_ID_CO2_CONCENTRATION= 0x00C5,   // 4 bytes - float
+    NBIOT_BLE_MESH_PROP_ID_TEMPERATURE      = 0x00C0,
+    NBIOT_BLE_MESH_PROP_ID_PRESSURE         = 0x00C1,
+    NBIOT_BLE_MESH_PROP_ID_HUMIDITY         = 0x00C2,
+    NBIOT_BLE_MESH_PROP_ID_LIGHT_INTENSITY  = 0x00C3,
+    NBIOT_BLE_MESH_PROP_ID_DC_CURRENT       = 0x00C4,
+    NBIOT_BLE_MESH_PROP_ID_CO2_CONCENTRATION= 0x00C5,
+    NBIOT_BLE_MESH_PROP_ID_TURBIDITY        = 0x00C6,
+    NBIOT_BLE_MESH_PROP_ID_PH               = 0x00C7,
 } NbiotBLEMeshProperties_t;
 
 #define NBIOT_MAX_PROP_CNT                  (8)
