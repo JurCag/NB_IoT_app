@@ -351,7 +351,7 @@ static void taskFeedTxQueue(void* pvParameters)
 #ifdef TEST_MQTT_PUBLISH
     memset(sensorData.b, '\0', sizeof(sensorData.b));
     memcpy(sensorData.b, payload1, strlen(payload1));
-    BG96_mqttQueuePayloadData(sensorData);
+    BG96_mqttQueuePayloadData("\"BG96_demoThing/sensors/TEST-NODE\"", sensorData);
     BG96_mqttPubQueuedData();
 #endif
 
@@ -607,7 +607,7 @@ static void taskAtPacketTxScheduler(void* pvParameters)
         {
             if (ulTaskNotifyTake(pdFALSE, MS_TO_TICKS(waitForRespProcessed)) > 0)
             {
-                waitForRespProcessed = tmpAtPacketOut.atCmd.maxRespTime_ms + (uint32_t)timeToProcessResp;
+                waitForRespProcessed = (tmpAtPacketOut.atCmd.maxRespTime_ms + (uint32_t)timeToProcessResp) * tmpAtPacketOut.atCmd.maxResendAttemps;
                 if (atPacketsTxQueue != NULL)
                 {
                     if (xQueueSend(atPacketsTxQueue, &tmpAtPacketOut, 0) != pdTRUE)
@@ -675,11 +675,11 @@ void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams)
     arg[strlen(arg)-1] = '\0';
 }
 
-void BG96_sendMqttData(SensorData_t data)
+void BG96_sendMqttData(char* topic, SensorData_t data)
 {
     if (taskMqttPubDataHandle != NULL)
     {
-        BG96_mqttQueuePayloadData(data);
+        BG96_mqttQueuePayloadData(topic, data);
         xTaskNotifyGive(taskMqttPubDataHandle);
     }
     else

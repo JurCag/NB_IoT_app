@@ -36,7 +36,7 @@
 // #define TEST_NBIOT_UPLOAD_DATARATE
 
 /* Uncomment to test mqtt publish cmd (sends one payload after initialization) */
-#define TEST_MQTT_PUBLISH
+// #define TEST_MQTT_PUBLISH
 
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
@@ -61,7 +61,7 @@ void BG96_txStr(char* str);
 void BG96_txBytes(char* bytes, uint16_t len);
 void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
-void BG96_sendMqttData(SensorData_t data);
+void BG96_sendMqttData(char* topic, SensorData_t data);
 void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn);
 
 /* FreeRTOS */

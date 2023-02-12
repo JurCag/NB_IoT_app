@@ -20,9 +20,16 @@ static uint8_t timerPubDataExpired = 0;
 
 #define PAYLOAD_DATA_QUEUE_LENGTH       (30)
 #define PAYLOAD_DATA_QUEUE_ITEM_SIZE    (sizeof(PayloadData_t))
-static StaticQueue_t payloadDataStaticQueue;
 static uint8_t payloadDataQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE];
 static QueueHandle_t payloadDataQueue = NULL;
+static StaticQueue_t payloadDataStaticQueue;
+
+static MqttTopic_t mqttTopic;
+static uint8_t topicQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * TOPIC_QUEUE_ITEM_SIZE];
+static QueueHandle_t topicQueue = NULL;
+static StaticQueue_t topicStaticQueue;
+
+// static uint8_t prevMqttMesgSuccSent = 1;
 
 void BG96_checkIfConnectedToMqttServer(void)
 {
@@ -128,11 +135,20 @@ void BG96_mqttCreatePayloadDataQueue(void)
                                           PAYLOAD_DATA_QUEUE_ITEM_SIZE,
                                           payloadDataQueueStorageArea,
                                           &payloadDataStaticQueue);
+    topicQueue = xQueueCreateStatic(PAYLOAD_DATA_QUEUE_LENGTH,
+                                    TOPIC_QUEUE_ITEM_SIZE,
+                                    topicQueueStorageArea,
+                                    &topicStaticQueue);
 }
 
-void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
+void BG96_mqttQueuePayloadData(char* topic, PayloadData_t payloadData)
 {
     char str[64];
+    static MqttTopic_t tmpTopic;
+
+    memset(tmpTopic.b, '\0', sizeof(MqttTopic_t));
+    memcpy(tmpTopic.b, topic, strlen(topic));
+
     if (payloadDataQueue != NULL)
     {
         sprintf(str, "MQTT Payload Data Queue Num of elements: [%d/%d]\r\n", uxQueueMessagesWaiting(payloadDataQueue), PAYLOAD_DATA_QUEUE_LENGTH);
@@ -142,6 +158,12 @@ void BG96_mqttQueuePayloadData(PayloadData_t payloadData)
             dumpInfo("MQTT Payload Data Queue: [FULL]\r\n");
             xQueueReset(payloadDataQueue);
             dumpInfo("RESET MQTT Payload Data Queue: [EMPTY]\r\n");
+        }
+        if (xQueueSend(topicQueue, tmpTopic.b, 10) == errQUEUE_FULL)
+        {
+            dumpInfo("MQTT Topic Queue: [FULL]\r\n");
+            xQueueReset(topicQueue);
+            dumpInfo("RESET MQTT Topic Queue: [EMPTY]\r\n");
         }
     }
     else
@@ -154,7 +176,6 @@ void BG96_mqttPubQueuedData(void)
     static uint8_t idx = 0;
 
     static uint8_t retain = 0;
-    static char* mqttTopic = "\"BG96_demoThing/sensors\"";
 
     // The timer is here to ensure that the mqtt connection is established before publish data
     // E.g. the mqtt open and conn commands were sent and imidiately afterwards the qmtpub is sent
@@ -201,12 +222,17 @@ void BG96_mqttPubQueuedData(void)
                 }
             }
 
+            if (xQueueReceive(topicQueue, &mqttTopic, 0) != pdTRUE)
+            {
+                dumpInfo("MQTT Topic Not received!\r\n");
+            }
+
             idx = 0;
             paramsArr[idx++] = (void*) &client_idx;
             paramsArr[idx++] = (void*) &msgID;
             paramsArr[idx++] = (void*) &qos;
             paramsArr[idx++] = (void*) &retain;
-            paramsArr[idx++] = (void*) mqttTopic;
+            paramsArr[idx++] = (void*) mqttTopic.b;
             prepAtCmdArgs(AT_publishMessages.arg, paramsArr, idx);
             queueAtPacket(&AT_publishMessages, WRITE_COMMAND);
             break;

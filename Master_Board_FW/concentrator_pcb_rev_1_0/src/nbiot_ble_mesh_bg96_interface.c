@@ -8,6 +8,7 @@ static void taskSensorDataQueueing(void *pvParameters);
 static void nbiotCreateTaskSensorDataQueueing(void);
 
 static SensorData_t jsonData;
+static char topic[TOPIC_QUEUE_ITEM_SIZE];
 
 void nbiotCreateTaskSensorDataGathering(void)
 {
@@ -208,7 +209,13 @@ void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* data
 
     strcat(jsonData.b, "]}");
     // dumpInfo(jsonData.b);
-    
+
+    memset(topic, '\0', sizeof(topic));
+    strcat(topic, "\"BG96_demoThing/sensors/");
+    strcat(topic, node->name);
+    strcat(topic,"\"");
+    ESP_LOGI(tag, "Pubslihing to topic: %s", topic);
+
     xTaskNotifyGive(taskSensorDataQueueingHandle);
 }
 
@@ -218,7 +225,7 @@ static void taskSensorDataQueueing(void *pvParameters)
     {
         if (ulTaskNotifyTake(pdFALSE, MS_TO_TICKS(1000)) > 0)
         {
-            BG96_sendMqttData(jsonData);
+            BG96_sendMqttData(topic, jsonData);
         }
     }
 }

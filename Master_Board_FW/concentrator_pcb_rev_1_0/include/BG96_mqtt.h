@@ -9,13 +9,19 @@
 
 typedef SensorData_t PayloadData_t;
 
+#define TOPIC_QUEUE_ITEM_SIZE           (64)
+typedef struct
+{
+    char b[TOPIC_QUEUE_ITEM_SIZE];
+} MqttTopic_t;
+
 void BG96_mqttConfigParams(void);
 void BG96_mqttOpenConn(void);
 void BG96_mqttConnToServer(void);
 void BG96_mqttPubQueuedData(void);
 
 void BG96_mqttCreatePayloadDataQueue(void);
-void BG96_mqttQueuePayloadData(PayloadData_t pubData);
+void BG96_mqttQueuePayloadData(char* topic, PayloadData_t payloadData);
 
 void BG96_checkIfConnectedToMqttServer(void);
 uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data);
