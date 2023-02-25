@@ -32,6 +32,7 @@ AtCmd_t AT_configureParametersOfSSLContext;
 AtCmd_t AT_configureOptionalParametersOfMQTT;
 AtCmd_t AT_openNetworkConnectionForMQTTClient;
 AtCmd_t AT_connectClientToMQTTServer;
+AtCmd_t AT_subscribeToTopics;
 AtCmd_t AT_publishMessages;
 
 #endif // __AT_CMDS_H__

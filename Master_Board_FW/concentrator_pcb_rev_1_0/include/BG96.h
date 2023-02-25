@@ -29,6 +29,8 @@
 #define BG96_HOLD_POWER_UP_PIN_MS   (750) 
 #define RESEND_ATTEMPTS             (4)
 
+#define ASYNC_CMDS_MAX              (10)
+
 /* Uncomment to gather data from sensor boards through BLE even if GSM modem not present */
 // #define DEBUG_SENSOR_DATA_GATHERING
 
@@ -36,7 +38,10 @@
 // #define TEST_NBIOT_UPLOAD_DATARATE
 
 /* Uncomment to test mqtt publish cmd (sends one payload after initialization) */
-// #define TEST_MQTT_PUBLISH
+#define TEST_MQTT_PUBLISH
+
+/* Uncomment to subscribe to mmtPeriods topic */
+#define SUBSCRIBE_TO_MMT_PERIODS_TOPIC
 
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
@@ -63,6 +68,8 @@ void queueAtPacket(AtCmd_t* cmd, AtCmdType_t type);
 void prepAtCmdArgs(char* arg, void** paramsArr, const uint8_t numOfParams);
 void BG96_sendMqttData(char* topic, SensorData_t data);
 void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn);
+
+bool BG96_insertAsyncCmd(BG96_AsyncCmd_t* cmd);
 
 /* FreeRTOS */
 void createTaskRx(void);

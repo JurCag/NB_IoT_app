@@ -29,8 +29,6 @@ static uint8_t topicQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * TOPIC_QUEUE_ITE
 static QueueHandle_t topicQueue = NULL;
 static StaticQueue_t topicStaticQueue;
 
-// static uint8_t prevMqttMesgSuccSent = 1;
-
 void BG96_checkIfConnectedToMqttServer(void)
 {
     queueAtPacket(&AT_connectClientToMQTTServer, READ_COMMAND);
@@ -256,6 +254,24 @@ static void timerPubDataCB(TimerHandle_t xTimer)
     timerPubDataExpired = 1;
 }
 
+void BG96_mqttSubToTopic(char* subTopic)
+{
+    static void* paramsArr[MAX_PARAMS];
+    static uint8_t idx = 0;
+
+    static uint8_t subscribeQoS = QOS1_AT_LEAST_ONCE;
+    static char topic[128];
+    strcpy(topic, subTopic);
+
+    idx = 0;
+    paramsArr[idx++] = (void*) &client_idx;
+    paramsArr[idx++] = (void*) &msgID;
+    paramsArr[idx++] = (void*) topic;
+    paramsArr[idx++] = (void*) &subscribeQoS;
+    prepAtCmdArgs(AT_subscribeToTopics.arg, paramsArr, idx);
+    queueAtPacket(&AT_subscribeToTopics, WRITE_COMMAND);
+}
+
 uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
 {
     BG96_AtPacket_t tempPacket; // sent packet
@@ -285,7 +301,7 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                 i = 0;
                 expInfoArgs[i++] = client_idx;
                 expInfoArgs[i++] = NETWORK_OPENED_SUCCESSFULLY;
-                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS) // expecting e.g. +QMTOPEN: 0,0
                 {
                     mqttOpened = 1;
                     dumpInfo("MQTT open: [SUCCESS]\r\n");
@@ -321,7 +337,7 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                 expInfoArgs[i++] = client_idx;
                 expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
                 expInfoArgs[i++] = CONNECTION_ACCEPTED;
-                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)  // expecting e.g. +QMTCONN: 0,0,0
                 {
                     mqttConnected = 1;
                     dumpInfo("MQTT connect: [SUCCESS]\r\n");
@@ -340,7 +356,26 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
         return EXIT_SUCCESS;
         break;
     case SUBSCRIBE_TO_TOPICS:
-        return EXIT_SUCCESS;
+        if (tempPacket.atCmdType == WRITE_COMMAND)
+        {
+            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+            {
+                i = 0;
+                expInfoArgs[i++] = client_idx;
+                expInfoArgs[i++] = msgID;
+                expInfoArgs[i++] = PACKET_SENT_SUCCESSFULLY;
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)  // expecting e.g. +QMTPUB: 0,1,0
+                {
+                    dumpInfo("MQTT subscribe: [SUCCESS]\r\n");
+                    return EXIT_SUCCESS;
+                }
+                else
+                {
+                    dumpInfo("MQTT subscribe: [FAIL]\r\n");
+                    return EXIT_FAILURE;
+                }
+            }
+        }
         break;
     case PUBLISH_MESSAGES:
         if (tempPacket.atCmdType == WRITE_COMMAND)

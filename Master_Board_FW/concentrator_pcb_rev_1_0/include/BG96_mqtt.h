@@ -19,6 +19,7 @@ void BG96_mqttConfigParams(void);
 void BG96_mqttOpenConn(void);
 void BG96_mqttConnToServer(void);
 void BG96_mqttPubQueuedData(void);
+void BG96_mqttSubToTopic(char* subTopic);
 
 void BG96_mqttCreatePayloadDataQueue(void);
 void BG96_mqttQueuePayloadData(char* topic, PayloadData_t payloadData);

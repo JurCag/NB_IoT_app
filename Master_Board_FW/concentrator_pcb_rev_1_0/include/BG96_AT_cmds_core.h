@@ -120,6 +120,12 @@ typedef struct
     AtCmdType_t atCmdType;
 } BG96_AtPacket_t;
 
+typedef struct 
+{
+    char cmd[16];
+    void (*cmdCallback)(char*);
+} BG96_AsyncCmd_t;
+
 typedef enum
 {
     SSL_CTX_ID_0 = 0,

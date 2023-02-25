@@ -31,6 +31,10 @@ static TaskHandle_t taskMqttPubDataHandle = NULL;
 static TaskHandle_t taskAtPacketTxSchedulerHandle = NULL;
 static BG96_startGatheringSensorDataCB_t startGatheringSensorDataCB = NULL;
 
+static bool checkAndServeAsyncCmd(char cmdBody[]);
+static BG96_AsyncCmd_t asyncCmdsArray[ASYNC_CMDS_MAX];
+static uint8_t numOfAsyncElements = 0;
+
 /* Local FreeRTOS tasks */
 static void taskRx(void* pvParameters);
 static void taskTx(void *pvParameters);
@@ -116,7 +120,7 @@ void createTaskRx(void)
     xTaskCreate(
                 taskRx,                         /* Task function */
                 "taskRx",                       /* Name of task */
-                2048,                           /* Stack size of task */
+                8192,                           /* Stack size of task */
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 4,           /* Priority of the task */
                 &taskRxHandle                   /* Handle of created task */
@@ -312,6 +316,7 @@ static void taskPowerUpModem(void *pvParameters)
                 startGatheringSensorData();
 #else
                 dumpInfo("RESTARTING ESP due to power up fail.\r\n");
+                TASK_DELAY_MS(2000);
                 esp_restart();
 #endif
                 break;
@@ -354,6 +359,10 @@ static void taskFeedTxQueue(void* pvParameters)
     BG96_mqttQueuePayloadData("\"BG96_demoThing/sensors/TEST-NODE\"", sensorData);
     BG96_mqttPubQueuedData();
 #endif
+
+// #ifdef SUBSCRIBE_TO_MMT_PERIODS_TOPIC
+//     BG96_mqttSubToTopic("\"BG96_demoThing/mmtPeriods/command\"");
+// #endif
 
     // Sensor data gathering and comm over mqtt
     dumpDebug("Ready to receive sensor data\r\n");
@@ -560,9 +569,12 @@ static void queueRxData(RxData_t rxData)
 {
     if (rxDataQueue != NULL)
     {
-        if (xQueueSend(rxDataQueue, rxData.b, MS_TO_TICKS(10)) != pdTRUE)
+        if (checkAndServeAsyncCmd(rxData.b) == false)
         {
-            dumpInfo("Receive Data Queue is full");
+            if (xQueueSend(rxDataQueue, rxData.b, MS_TO_TICKS(10)) != pdTRUE)
+            {
+                dumpInfo("Receive Data Queue is full");
+            }
         }
     }
     else
@@ -775,4 +787,39 @@ void dumpDebug(char* str)
     UART_writeStr(UART_PC, "\r\nDBG >> ");
     UART_writeStr(UART_PC, str);
 #endif
+}
+
+
+bool BG96_insertAsyncCmd(BG96_AsyncCmd_t* cmd)
+{
+    if (numOfAsyncElements >= ASYNC_CMDS_MAX) 
+    {
+        return false;
+    }
+
+    memcpy(&(asyncCmdsArray[numOfAsyncElements]), cmd, sizeof(asyncCmdsArray[0]));
+    
+    dumpInfo("Inserted async: \r\n");
+    dumpInfo(asyncCmdsArray[numOfAsyncElements].cmd);
+    dumpInfo("\r\n");
+
+    numOfAsyncElements++;
+    return true;
+}
+
+static bool checkAndServeAsyncCmd(char cmdBody[])
+{
+    for (uint8_t i = 0; i < numOfAsyncElements; i++)
+    {
+        if (strstr(cmdBody, asyncCmdsArray[i].cmd) != NULL)
+        {
+            if (asyncCmdsArray[i].cmdCallback != NULL)
+            {
+                asyncCmdsArray[i].cmdCallback(cmdBody);
+            }
+            return true;
+        }
+    }
+
+    return false;
 }

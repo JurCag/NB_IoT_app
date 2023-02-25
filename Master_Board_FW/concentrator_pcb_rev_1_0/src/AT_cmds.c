@@ -166,6 +166,18 @@ AtCmd_t AT_connectClientToMQTTServer =
     .maxResendAttemps = 4
 };
 
+AtCmd_t AT_subscribeToTopics = 
+{
+    .family = MQTT_RELATED_AT_COMMANDS,
+    .id = SUBSCRIBE_TO_TOPICS,
+    .cmd = "+QMTSUB",
+    .arg = "",
+    .confirmation = "OK",
+    .error = "ERROR",
+    .maxRespTime_ms = 15000,
+    .maxResendAttemps = 4
+};
+
 AtCmd_t AT_publishMessages = 
 {
     .family = MQTT_RELATED_AT_COMMANDS,
