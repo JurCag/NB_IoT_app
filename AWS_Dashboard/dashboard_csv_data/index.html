@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>NB-IoT Dashboard</title>
+    <style>
+        h1 {
+            font-family: Consolas, sans-serif;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .input-container {
+            display: grid;
+            grid-template-columns: auto 1fr auto 1fr auto 1fr auto 1fr auto;
+            grid-gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        label {
+            font-size: 20px;
+            display: inline-block;
+            width: 100px;
+            text-align: right;
+        }
+
+        input[type="number"] {
+            width: 100px;
+            padding: 5px;
+            font-size: 20px;
+            border-radius: 5px;
+            border: 2px solid #ccc;
+            text-align: center;
+            border-width: 2px;
+            cursor: ns-resize;
+        }
+
+        input[type="date"] {
+            width: 160px;
+            padding: 5px;
+            font-size: 20px;
+            border-radius: 5px;
+            border: 2px solid #ccc;
+            text-align: center;
+            border-width: 2px;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            cursor: pointer;
+        }
+
+        button {
+            padding: 8px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: none;
+            background-color: #374137;
+            color: #fff;
+            cursor: pointer;
+            border-width: 2px;
+            width: 160px
+        }
+
+        button:hover {
+            background-color: #181b18;
+        }
+
+        select {
+            cursor: pointer;
+            min-width: 120px;
+            font-size: 20px;
+            padding: 5px;
+            border-radius: 5px;
+            border: 2px solid #ccc;
+            text-align-last: center;
+            -moz-text-align-last: center;
+            border-width: 2px;
+        }
+
+        #from-date-label {
+            grid-column: 3;
+        }
+
+        #download-btn {
+            padding: 8px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: none;
+            background-color: #008eb9;
+            color: #fff;
+            cursor: pointer;
+            border-width: 2px;
+            grid-column-start: 6;
+        }
+        #download-btn:hover {
+            background-color: #006888;
+        }
+
+        #show-btn {
+            padding: 8px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: none;
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+            border-width: 2px;
+            grid-column-start: 4;
+        }
+        #show-btn:hover {
+            background-color: #3e8e41;
+        }
+
+        #live-btn {
+            padding: 8px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: none;
+            background-color: #ff5100;
+            color: #fff;
+            cursor: pointer;
+            border-width: 2px;
+            grid-column-start: 5;
+        }
+        #live-btn:hover {
+            background-color: #cf4200;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>NB-IoT Dashboard</h1>
+    </header>
+
+    <div class="input-container">
+        <label for="node-input">Node:</label>
+        <select id="node-input" name="node-input"></select>
+        
+        <label for="hours">Hours:</label>
+        <input type="number" id="hours" value="0" min="0" max="48" step="1" />
+        
+        <label for="minutes">Minutes:</label>
+        <input type="number" id="minutes" value="0" min="0" max="59" step="1" />
+        
+        <label for="seconds">Seconds:</label>
+        <input type="number" id="seconds" value="0" min="0" max="55" step="5" />
+        
+        <button id="update-period-button">Update period</button>
+
+        <label for="from-date" id="from-date-label">From date:</label>
+        <input type="date" id="from-date" name="from-date">
+
+        <label for="to-date">To date:</label>
+        <input type="date" id="to-date" name="to-date">
+
+        <button id="show-btn">Show Data</button>
+        <button id="live-btn">Live Data</button>
+        <button id="download-btn">Download Data</button>
+        
+    </div>
+
+    <div id="mainContainer"></div>
+
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="./script.js"></script>
+</body>
+
+</html>
