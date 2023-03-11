@@ -1,6 +1,7 @@
 
 secrets.*
 secrets/
+.tmp*/
 
 # Prerequisites
 *.d
