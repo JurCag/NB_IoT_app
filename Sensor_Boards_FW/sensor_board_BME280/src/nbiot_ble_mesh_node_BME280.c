@@ -29,7 +29,7 @@ static NbiotSensorSetup_t sensorNbiotSetup[] =
         .name           = SENSOR_NAME,
         .propName       = "pressure",
         .propDataType   = NBIOT_FLOAT,
-        .mmtUnit        = "hPa"
+        .mmtUnit        = "kPa"
     }
 };
 

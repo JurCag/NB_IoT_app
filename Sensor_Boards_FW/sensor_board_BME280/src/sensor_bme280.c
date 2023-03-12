@@ -185,6 +185,6 @@ float sensorBme280GetHumidity(void)
 
 float sensorBme280GetPressure(void)
 {
-	ESP_LOGI(TAG_BME280, "Pres INT %d, float %.2f", compPres, (compPres / 100.0));
-	return (compPres / 100.0);
+	ESP_LOGI(TAG_BME280, "Pres INT %d, float %.2f", compPres, (compPres / 1000.0));
+	return (compPres / 1000.0);
 }
