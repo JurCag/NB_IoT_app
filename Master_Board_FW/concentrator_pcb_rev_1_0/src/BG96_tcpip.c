@@ -15,6 +15,12 @@ void BG96_tcpipConfigParams(void)
     paramsArr[idx++] = (void*) VODAFONE_APN_STR;
     prepAtCmdArgs(AT_configureParametersOfTcpIpContext.arg, paramsArr, idx);
     queueAtPacket(&AT_configureParametersOfTcpIpContext, WRITE_COMMAND); 
+}
+
+void BG96_tcpipActivatePDP(void)
+{
+    static void* paramsArr[MAX_PARAMS];
+    static uint8_t idx = 0;
 
     idx = 0;
     paramsArr[idx++] = (void*) (&contextID);
@@ -22,7 +28,17 @@ void BG96_tcpipConfigParams(void)
     queueAtPacket(&AT_activatePDPContext, WRITE_COMMAND);   
 
     queueAtPacket(&AT_activatePDPContext, READ_COMMAND);
+}
 
+void BG96_tcpipDeactivatePDP(void)
+{
+    static void* paramsArr[MAX_PARAMS];
+    static uint8_t idx = 0;
+
+    idx = 0;
+    paramsArr[idx++] = (void*) (&contextID);
+    prepAtCmdArgs(AT_deactivatePDPContext.arg, paramsArr, idx);
+    queueAtPacket(&AT_deactivatePDPContext, WRITE_COMMAND);
 }
 
 uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
@@ -41,7 +57,7 @@ uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
         case ACTIVATE_A_PDP_CONTEXT:
             if (tempPacket.atCmdType == WRITE_COMMAND)
             {
-                dumpInfo("PDP Context: [ACTIVATED]\r\n");
+                dumpInfo("PDP Context Activation: [SUCCESS]\r\n");
                 pdpContextActivated = 1;
                 return EXIT_SUCCESS;
             }
@@ -50,7 +66,7 @@ uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data)
         case DEACTIVATE_A_PDP_CONTEXT:
             if (tempPacket.atCmdType == WRITE_COMMAND)
             {
-                dumpInfo("PDP Context: [DEACTIVATED]\r\n");
+                dumpInfo("PDP Context Deactivation: [SUCCESS]\r\n");
                 pdpContextActivated = 0;
                 return EXIT_SUCCESS;
             }

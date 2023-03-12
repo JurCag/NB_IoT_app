@@ -9,6 +9,7 @@ static uint8_t qos = 1;
 static void mqttInputPayload(char* payload);
 uint8_t isInfoResponseCorrect(char* rxResponse, AtCmd_t* atCmd, uint8_t* paramsArr, uint8_t numOfParams);
 static void gsmConnectionStartOver(void);
+static void parseStateChangeInMqttLinkLayer(char* msg);
 
 TimerHandle_t timerConnToServer = NULL;
 static void timerConnToServerCB(TimerHandle_t xTimer);
@@ -28,6 +29,21 @@ static MqttTopic_t mqttTopic;
 static uint8_t topicQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * TOPIC_QUEUE_ITEM_SIZE];
 static QueueHandle_t topicQueue = NULL;
 static StaticQueue_t topicStaticQueue;
+
+static uint8_t resendPayload = 0;
+
+static char subscribedTopics[3][128];
+static uint8_t numOfSubTopics = 0;
+
+static TaskHandle_t taskReopenConnHandle = NULL;
+static void taskReopenConn(void* pvParameters);
+static void reopenMqttConnection(void);
+
+static BG96_AsyncCmd_t stateChangeAsyncCmd = 
+{
+    .cmd = "+QMTSTAT",
+    .cmdCallback = parseStateChangeInMqttLinkLayer
+};
 
 void BG96_checkIfConnectedToMqttServer(void)
 {
@@ -58,6 +74,10 @@ void BG96_mqttConfigParams(void)
     queueAtPacket(&AT_configureOptionalParametersOfMQTT, WRITE_COMMAND); 
 }
 
+void BG96_mqttRegisterAsyncCmds(void)
+{
+    BG96_insertAsyncCmd(&stateChangeAsyncCmd);
+}
 
 void BG96_mqttOpenConn(void)
 {
@@ -72,6 +92,17 @@ void BG96_mqttOpenConn(void)
     paramsArr[idx++] = (void*) port;
     prepAtCmdArgs(AT_openNetworkConnectionForMQTTClient.arg, paramsArr, idx);
     queueAtPacket(&AT_openNetworkConnectionForMQTTClient, WRITE_COMMAND);
+}
+
+void BG96_mqttCloseConn(void)
+{
+    static void* paramsArr[MAX_PARAMS];
+    static uint8_t idx = 0;
+
+    idx = 0;
+    paramsArr[idx++] = (void*) &client_idx;
+    prepAtCmdArgs(AT_closeNetworkForMQTTClient.arg, paramsArr, idx);
+    queueAtPacket(&AT_closeNetworkForMQTTClient, WRITE_COMMAND);
 }
 
 void BG96_mqttConnToServer(void)
@@ -153,19 +184,17 @@ void BG96_mqttQueuePayloadData(char* topic, PayloadData_t payloadData)
         dumpDebug(str);
         if(xQueueSend(payloadDataQueue, payloadData.b, 10) == errQUEUE_FULL)
         {
-            dumpInfo("MQTT Payload Data Queue: [FULL]\r\n");
-            xQueueReset(payloadDataQueue);
-            dumpInfo("RESET MQTT Payload Data Queue: [EMPTY]\r\n");
+            dumpInfo("MQTT Payload Data Queue: [FULL]. Payload not inserted.\r\n");
         }
         if (xQueueSend(topicQueue, tmpTopic.b, 10) == errQUEUE_FULL)
         {
-            dumpInfo("MQTT Topic Queue: [FULL]\r\n");
-            xQueueReset(topicQueue);
-            dumpInfo("RESET MQTT Topic Queue: [EMPTY]\r\n");
+            dumpInfo("MQTT Topic Queue: [FULL]. Payload's topic not inserted.\r\n");
         }
     }
     else
+    {
         dumpInfo("MQTT Payload Data Queue: [NOT CREATED]\r\n");
+    }
 }
 
 void BG96_mqttPubQueuedData(void)
@@ -258,10 +287,22 @@ void BG96_mqttSubToTopic(char* subTopic)
 {
     static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
-
     static uint8_t subscribeQoS = QOS1_AT_LEAST_ONCE;
     static char topic[128];
+    uint8_t isTopicInArr = 0;
+
     strcpy(topic, subTopic);
+    for (uint8_t i = 0; i < numOfSubTopics; i++) 
+    {
+        if (strcmp(topic, subscribedTopics[i]) == 0)
+        {
+            isTopicInArr = 1;
+        }
+    }
+    if (isTopicInArr == 0)
+    {
+        strcpy(subscribedTopics[numOfSubTopics++], topic);
+    }
 
     idx = 0;
     paramsArr[idx++] = (void*) &client_idx;
@@ -278,12 +319,10 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
     char tempData[BUFFER_SIZE];
     static RxData_t rxData;
     static PayloadData_t payloadData;
+    static uint8_t mqttPublishFailsInRow = 0;
 
     uint8_t expInfoArgs[8];
     static uint8_t i = 0;
-
-    static uint8_t resendPayload = 0;
-
 
     memcpy(&tempPacket, packet, sizeof(BG96_AtPacket_t));
     memcpy(tempData, data, BUFFER_SIZE);
@@ -316,6 +355,24 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
         return EXIT_SUCCESS;
         break;
     case CLOSE_A_NETWORK_FOR_MQTT_CLIENT:
+        if (tempPacket.atCmdType == WRITE_COMMAND)
+        {
+            if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
+            {
+                i = 0;
+                expInfoArgs[i++] = client_idx;
+                expInfoArgs[i++] = NETWORK_CLOSED_SUCCESSFULLY;
+                if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS) // expecting e.g. +QMTCLOSE: 0,0
+                {
+                    mqttOpened = 0;
+                    dumpInfo("MQTT close: [SUCCESS]\r\n");
+                }
+                else
+                {
+                    dumpInfo("MQTT close: [FAIL]\r\n");
+                }
+            }
+        }
         return EXIT_SUCCESS;
         break;
     case CONNECT_A_CLIENT_TO_MQTT_SERVER:
@@ -416,12 +473,19 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                             {
                                 dumpInfo("MQTT publish: [SUCCESS]\r\n");
                                 resendPayload = 0;
+                                mqttPublishFailsInRow = 0;
                                 return EXIT_SUCCESS;
                             }
                             else
                             {
                                 dumpInfo("MQTT publish: [FAIL]\r\n");
                                 resendPayload = 1;
+                                mqttPublishFailsInRow++;
+                                
+                                if (mqttPublishFailsInRow > AT_publishMessages.maxResendAttemps)
+                                {
+                                    BG96_mqttCreateTaskReopenConnection();
+                                }
                                 return EXIT_FAILURE;
                             }
                         }
@@ -490,4 +554,90 @@ static void gsmConnectionStartOver(void)
 {
     dumpInfo("Restartig ESP to start the GSM connection over.\n");
     esp_restart();
+}
+
+// Callback for async cmd
+static void parseStateChangeInMqttLinkLayer(char* msg)
+{
+    char* token = strtok(msg, ",");
+    token = strtok(NULL, ",");
+    char printMsg[64];
+    uint8_t errCode = atoi(token);
+
+    switch (errCode)
+    {
+    case TCPIP_CONN_CLOSED:
+        dumpInfo("PDP connection is closed or reset by peer.\r\n");
+        break;
+    case TCPIP_PINGREQ_PACK_TIMEDOUT:
+        dumpInfo("Sending PINGREQ packet timedout or failed.\r\n");
+        BG96_mqttCreateTaskReopenConnection();
+        break;
+    case TCPIP_CLIENT_DISCONNECTS:
+        dumpInfo("Client disconnected. Server initiates to close MQTT connection.\r\n");
+        break;
+    default:
+        memset(printMsg, '\0', sizeof(printMsg));
+        sprintf(printMsg, "Unknown/unimplemented URC error code: [%d]\r\n", errCode);
+        dumpInfo(printMsg);
+        break;
+    }
+}
+
+void BG96_mqttCreateTaskReopenConnection(void)
+{
+    if (taskReopenConnHandle == NULL)
+    {
+        BG96_disableResendingQueuedAtPackets();           // make sure its stopped before next resend in taskTx
+
+        xTaskCreate(
+                    taskReopenConn,               /* Task function */
+                    "taskReopenConn",             /* Name of task */
+                    2048,                         /* Stack size of task */
+                    NULL,                         /* Parameter of the task */
+                    tskIDLE_PRIORITY + 3,         /* Priority of the task */
+                    &taskReopenConnHandle         /* Handle of created task */
+                    );
+    }
+    else
+    {
+        dumpInfo("Task taskReopenConn already created.\r\n");
+    }
+}
+
+
+static void taskReopenConn(void* pvParameters)
+{
+    reopenMqttConnection();
+    taskReopenConnHandle = NULL; 
+    vTaskDelete(NULL);
+}
+
+static void reopenMqttConnection(void)
+{
+    BG96_pauseSendMqttData();
+    dumpInfo("Trying to REOPEN MQTT CONNECTION\r\n");
+
+    BG96_recreateTasksAndResetQueues();
+    BG96_enableResendingQueuedAtPackets();
+
+    if (payloadDataQueue != NULL)
+    {
+        resendPayload = 0;
+        xQueueReset(payloadDataQueue);
+    }
+    if (topicQueue != NULL)
+    {
+        xQueueReset(topicQueue);
+    }
+
+    BG96_tcpipDeactivatePDP();
+    BG96_tcpipActivatePDP();
+    BG96_mqttOpenConn();
+    BG96_mqttConnToServer();
+    for (uint8_t i = 0; i < numOfSubTopics; i++)
+    {
+        BG96_mqttSubToTopic(subscribedTopics[i]);
+    }
+    BG96_resumeSendMqttData();
 }

@@ -6,7 +6,8 @@
 #include "AT_cmds.h"
 
 void BG96_tcpipConfigParams(void);
-
+void BG96_tcpipActivatePDP(void);
+void BG96_tcpipDeactivatePDP(void);
 uint8_t BG96_tcpipResponseParser(BG96_AtPacket_t* packet, char* data);
 
 

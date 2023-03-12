@@ -4,8 +4,9 @@
 #include "nbiot_ble_mesh_provisioner_client.h"
 #include "BG96.h"
 
-#define DEFAULT_NODE_MMT_PERIOD_S          (30)
+#define DEFAULT_NODE_MMT_PERIOD_S          (20 * 60)
 #define DEFAULT_NODE_MMT_PERIOD_OFFSET_S   (2)
+#define NODE_NOT_ONLINE                    (-1)
 
 typedef struct
 {

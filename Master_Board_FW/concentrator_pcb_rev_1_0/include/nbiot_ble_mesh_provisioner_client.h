@@ -35,6 +35,9 @@
 
 #define PROP_ID_OMITTED                 0
 
+/* Uncomment to name nodes after their sensor - expects each node has only 1 sensor */
+#define NAME_NODES_AFTER_SENSOR_NAME
+
 typedef struct
 {
     char                        name[32];

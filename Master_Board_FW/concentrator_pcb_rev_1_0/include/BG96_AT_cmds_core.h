@@ -128,6 +128,17 @@ typedef struct
 
 typedef enum
 {
+    TCPIP_CONN_CLOSED           = 1,
+    TCPIP_PINGREQ_PACK_TIMEDOUT = 2,
+    TCPIP_CONNECT_PACK_TIMEDOUT = 3,
+    TCPIP_CONNACK_PACK_TIMEDOUT = 4,
+    TCPIP_CLIENT_DISCONNECTS    = 5,
+    TCPIP_CLIENT_CLOSES_MQTT    = 6,
+    TCPIP_LINK_NOT_VALID        = 7,
+} TcpipUrcErrorCodes_t;
+
+typedef enum
+{
     SSL_CTX_ID_0 = 0,
     SSL_CTX_ID_1 = 1,
     SSL_CTX_ID_2 = 2,
@@ -190,6 +201,12 @@ typedef enum
     FAILED_TO_PARSE_DOMAIN_NAME = 4,
     NETWORK_CONNECTION_ERROR    = 5
 } MqttOpenResult_t;
+
+typedef enum
+{
+    FAILED_TO_CLOSE_NETWORK     = -1,
+    NETWORK_CLOSED_SUCCESSFULLY = 0
+} MqttCloseResult_t;
 
 typedef enum
 {

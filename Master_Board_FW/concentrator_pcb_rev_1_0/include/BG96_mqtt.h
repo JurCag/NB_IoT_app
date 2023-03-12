@@ -6,6 +6,7 @@
 #include "BG96.h"
 #include "AT_cmds.h"
 #include "freertos/timers.h"
+#include "BG96_tcpip.h"
 
 typedef SensorData_t PayloadData_t;
 
@@ -16,8 +17,11 @@ typedef struct
 } MqttTopic_t;
 
 void BG96_mqttConfigParams(void);
+void BG96_mqttRegisterAsyncCmds(void);
 void BG96_mqttOpenConn(void);
+void BG96_mqttCloseConn(void);
 void BG96_mqttConnToServer(void);
+void BG96_mqttCreateTaskReopenConnection(void);
 void BG96_mqttPubQueuedData(void);
 void BG96_mqttSubToTopic(char* subTopic);
 

@@ -154,6 +154,18 @@ AtCmd_t AT_openNetworkConnectionForMQTTClient =
     .maxResendAttemps = 4
 };
 
+AtCmd_t AT_closeNetworkForMQTTClient = 
+{
+    .family = MQTT_RELATED_AT_COMMANDS,
+    .id = CLOSE_A_NETWORK_FOR_MQTT_CLIENT,
+    .cmd = "+QMTCLOSE",
+    .arg = "",
+    .confirmation = "OK",
+    .error = "ERROR",
+    .maxRespTime_ms = 300,
+    .maxResendAttemps = 4
+};
+
 AtCmd_t AT_connectClientToMQTTServer = 
 {
     .family = MQTT_RELATED_AT_COMMANDS,

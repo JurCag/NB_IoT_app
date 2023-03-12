@@ -63,6 +63,9 @@ static void startGatheringSensorData(void);
 static uint8_t responseParser(void);
 static uint8_t BG96_atCmdFamilyParser(BG96_AtPacket_t* atPacket, RxData_t* data);
 
+static bool isSendResendDisabled = false;
+static bool isSendMqttDataPaused = false;
+
 void BG96_txStr(char* str)
 {
     UART_writeStr(UART_BG96, str);
@@ -348,8 +351,10 @@ static void taskFeedTxQueue(void* pvParameters)
     BG96_sslConfigParams();
     BG96_mqttConfigParams();
     BG96_tcpipConfigParams();
+    BG96_tcpipActivatePDP();
 
     // Mqtt connection
+    BG96_mqttRegisterAsyncCmds();
     BG96_mqttOpenConn();
     BG96_mqttConnToServer();
     BG96_mqttCreatePayloadDataQueue();
@@ -359,10 +364,6 @@ static void taskFeedTxQueue(void* pvParameters)
     BG96_mqttQueuePayloadData("\"BG96_demoThing/sensors/TEST-NODE\"", sensorData);
     BG96_mqttPubQueuedData();
 #endif
-
-// #ifdef SUBSCRIBE_TO_MMT_PERIODS_TOPIC
-//     BG96_mqttSubToTopic("\"BG96_demoThing/mmtPeriods/command\"");
-// #endif
 
     // Sensor data gathering and comm over mqtt
     dumpDebug("Ready to receive sensor data\r\n");
@@ -390,19 +391,27 @@ static void taskMqttPubData(void* pvParameters)
 static void taskTx(void *pvParameters)
 {
     static int8_t parserResult = -1;
-    static char resendAttemptsStr[40];
-    memset(resendAttemptsStr, '\0', sizeof(resendAttemptsStr));
+    static char printMsg[40];
+    memset(printMsg, '\0', sizeof(printMsg));
 
-    while(1)
+    while (1)
     {
         if (xQueueReceive(atPacketsTxQueue, &deqdAtPacket, MS_TO_TICKS(200)) == pdTRUE)
         {
-            for(uint8_t sendAttempt = 0; sendAttempt < deqdAtPacket.atCmd.maxResendAttemps; sendAttempt++)
+            for (uint8_t sendAttempt = 0; sendAttempt < deqdAtPacket.atCmd.maxResendAttemps; sendAttempt++)
             {
+                if (isSendResendDisabled == true)
+                {
+                    // isSendResendDisabled = false;
+                    sprintf(printMsg, "Send/Resend DISABLED: [%s]\r\n", deqdAtPacket.atCmd.cmd);
+                    dumpInfo(printMsg);
+                    break;
+                }
+
                 if (sendAttempt > 0)
                 {
-                    sprintf(resendAttemptsStr, "Resend attempt: [%d/%d] %s\r\n", (sendAttempt + 1), deqdAtPacket.atCmd.maxResendAttemps, deqdAtPacket.atCmd.cmd);
-                    dumpInfo(resendAttemptsStr);
+                    sprintf(printMsg, "Resend attempt: [%d/%d] of cmd [%s]\r\n", (sendAttempt + 1), deqdAtPacket.atCmd.maxResendAttemps, deqdAtPacket.atCmd.cmd);
+                    dumpInfo(printMsg);
                 }
 
                 BG96_sendAtPacket(&deqdAtPacket);
@@ -420,6 +429,7 @@ static void taskTx(void *pvParameters)
 static uint8_t responseParser(void)
 {
     static RxData_t rxData;
+    char printMsg[128];
 
     if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(deqdAtPacket.atCmd.maxRespTime_ms)) == pdTRUE)
     {
@@ -462,16 +472,20 @@ static uint8_t responseParser(void)
         }
         else
         {
-            dumpInfo("Response: [DOESN'T MATCH]\r\n");
+            memset(printMsg, '\0', sizeof(printMsg));
+            sprintf(printMsg, "Response: [DOESN'T MATCH], Cmd: [%s], Response: [%s]\r\n", lastSentAtCmdStr, rxData.b);
+            dumpInfo(printMsg);
         }
     }
     else
     {
-        dumpInfo("Response: [MISSING]\r\n");
+        memset(printMsg, '\0', sizeof(printMsg));
+        sprintf(printMsg, "Response: [MISSING]. Last cmd: [%s]\r\n", lastSentAtCmdStr);
+        dumpInfo(printMsg);
         return EXIT_FAILURE;
     }
 
-    dumpInfo("Response: [MISSING]\r\n");
+    dumpInfo("Response: [MISSING / NOT IN TIME]\r\n");
     return EXIT_FAILURE;
 }
 
@@ -543,6 +557,40 @@ static void taskRx(void* pvParameters)
             }
             else
             {
+                char* okPos = strstr(rxDataPart.b, "OK");
+                if (okPos != NULL)
+                {
+                    char* plusPos = strchr(okPos, '+');
+                    if (plusPos != NULL)
+                    {
+                        // split e.g. "OK\r\n+QMTSTAT: 0,1\r\r" into 2 parts
+                        // because "OK" is followed by something that icnludes '+'
+                        char okPart[50];
+                        char nextCmdPart[50];
+                        memset(okPart, '\0', sizeof(okPart));
+                        memset(nextCmdPart, '\0', sizeof(nextCmdPart));
+
+                        strncpy(okPart, rxDataPart.b, okPos - rxDataPart.b + 2);
+                        okPart[okPos - rxDataPart.b + 2] = '\0';
+
+                        strcpy(nextCmdPart, okPos + 3);
+
+                        memcpy(rxData.b, okPart, strlen(okPart));
+                        printf("Ok part: %s\n", rxData.b);
+                        queueRxData(rxData);
+
+                        memset(rxData.b, '\0', sizeof(rxData.b));
+                        memcpy(rxData.b, nextCmdPart, strlen(nextCmdPart));
+                        printf("Second half: %s\n", rxData.b);
+                        queueRxData(rxData);
+
+                        dumpInterComm("[BG96 ->] ");
+                        dumpInterComm(rxData.b);
+                        memset(rxData.b, '\0', sizeof(rxData.b));
+                        continue;
+                    }
+                }
+
                 queueRxData(rxDataPart);
                 dumpInterComm("[BG96 ->] ");
                 dumpInterComm(rxDataPart.b);
@@ -691,8 +739,15 @@ void BG96_sendMqttData(char* topic, SensorData_t data)
 {
     if (taskMqttPubDataHandle != NULL)
     {
-        BG96_mqttQueuePayloadData(topic, data);
-        xTaskNotifyGive(taskMqttPubDataHandle);
+        if (isSendMqttDataPaused == false)
+        {
+            BG96_mqttQueuePayloadData(topic, data);
+            xTaskNotifyGive(taskMqttPubDataHandle);
+        }
+        else
+        {
+            dumpInfo("Send MQTT: [PAUSED]\r\n");
+        }
     }
     else
     {
@@ -822,4 +877,71 @@ static bool checkAndServeAsyncCmd(char cmdBody[])
     }
 
     return false;
+}
+
+void BG96_recreateTasksAndResetQueues(void)
+{
+    if (atPacketsTxSchedulerQueue != NULL)
+    {
+        xQueueReset(atPacketsTxSchedulerQueue);
+    }
+    if (atPacketsTxQueue != NULL)
+    {
+        xQueueReset(atPacketsTxQueue);
+    }
+    if (rxDataQueue != NULL)
+    {
+        xQueueReset(rxDataQueue);
+    }
+
+    if (taskTxHandle != NULL)
+    {
+        vTaskDelete(taskTxHandle);
+    }
+    if (taskAtPacketTxSchedulerHandle != NULL)
+    {
+        vTaskDelete(taskAtPacketTxSchedulerHandle);
+    }
+    if (taskMqttPubDataHandle != NULL)
+    {
+        vTaskDelete(taskMqttPubDataHandle);
+    }
+    
+    if (atPacketsTxSchedulerQueue != NULL)
+    {
+        xQueueReset(atPacketsTxSchedulerQueue);
+    }
+    if (atPacketsTxQueue != NULL)
+    {
+        xQueueReset(atPacketsTxQueue);
+    }
+    if (rxDataQueue != NULL)
+    {
+        xQueueReset(rxDataQueue);
+    }
+
+    createTaskAtPacketTxScheduler();
+    createTaskTx();
+    createTaskMqttPubData();
+    xTaskNotifyGive(taskAtPacketTxSchedulerHandle);
+}
+
+void BG96_disableResendingQueuedAtPackets(void)
+{
+    isSendResendDisabled = true;
+}
+
+void BG96_enableResendingQueuedAtPackets(void)
+{
+    isSendResendDisabled = false;
+}
+
+void BG96_pauseSendMqttData(void)
+{
+    isSendMqttDataPaused = true;
+}
+
+void BG96_resumeSendMqttData(void)
+{
+    isSendMqttDataPaused = false;
 }

@@ -812,6 +812,16 @@ static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unic
                 nodeToUpdate->nbiotSetup[i].mmtUnit);
     }
 
+#ifdef NAME_NODES_AFTER_SENSOR_NAME
+    // Update node name according to its sensor name
+    char newName[32];
+    memset(newName, '\0', sizeof(newName));
+    sprintf(newName, "NODE-%s", nodeToUpdate->nbiotSetup[0].name);
+    memset(nodeToUpdate->name, '\0', sizeof(nodeToUpdate->name));
+    memcpy(nodeToUpdate->name, newName, sizeof(nodeToUpdate->name));
+    printf("NEW NODE NAME: [%s]\r\n", nodeToUpdate->name);
+#endif
+
     printf("\r\nUpdating property IDs of node: [%x %x %x %x %x %x], Unicast Addr: [%d]\r\n", 
             nodeToUpdate->btMacAddr[0],
             nodeToUpdate->btMacAddr[1],
@@ -988,7 +998,7 @@ static void provisionerBusyStartTimer(void)
 
 static void provisionerFinishedStopTimer(void)
 {
-    printf("PROVISIONER FINISHED STOP TIMER\r\n");
+    printf("Provisioner finished stop timer\r\n");
     if (newNodeProvTimer != NULL)
     {
         if (xTimerIsTimerActive(newNodeProvTimer) != pdFALSE)
@@ -1005,7 +1015,7 @@ static void provisionerStillBusyResetTimer(void)
     {
         if ((xTimerIsTimerActive(newNodeProvTimer) != pdFALSE) & (isProvisionerReady() == 0))
         {
-            printf("RESTARTING TIMER TO EXTEND TIME FOR PROVISIONER\r\n");
+            printf("Restarting timer to extend time for provisioner\r\n");
             xTimerReset(newNodeProvTimer, MS_TO_TICKS(200));
         }
     }
@@ -1021,7 +1031,7 @@ static uint8_t isProvisionerReady(void)
 
 static void newNodeProvTimerCB(TimerHandle_t xTimer)
 {
-    printf("TIMER EXPIRED ALLOW NEW NODE TO BE PROVISIONED\r\n");
+    printf("Timer expired allow new node to be provisioned\r\n");
     xTimerStop(newNodeProvTimer, 0);
     // When timer elapsed and new node is not provisioned allow next one to be
     busyProvisioningNewNode = 0;

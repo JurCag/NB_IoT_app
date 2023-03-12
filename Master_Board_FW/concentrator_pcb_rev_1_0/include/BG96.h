@@ -40,9 +40,6 @@
 /* Uncomment to test mqtt publish cmd (sends one payload after initialization) */
 #define TEST_MQTT_PUBLISH
 
-/* Uncomment to subscribe to mmtPeriods topic */
-#define SUBSCRIBE_TO_MMT_PERIODS_TOPIC
-
 /* Uncomment to see intern communication (ESP32 <==> BG96) (default commented) */
 #define DUMP_INTER_COMM
 
@@ -70,6 +67,11 @@ void BG96_sendMqttData(char* topic, SensorData_t data);
 void BG96_registerStartGatheringSensorDataCB(BG96_startGatheringSensorDataCB_t ptrToFcn);
 
 bool BG96_insertAsyncCmd(BG96_AsyncCmd_t* cmd);
+void BG96_recreateTasksAndResetQueues(void);
+void BG96_disableResendingQueuedAtPackets(void);
+void BG96_enableResendingQueuedAtPackets(void);
+void BG96_pauseSendMqttData(void);
+void BG96_resumeSendMqttData(void);
 
 /* FreeRTOS */
 void createTaskRx(void);

@@ -10,13 +10,14 @@ static void nbiotCreateTaskSensorDataQueueing(void);
 static SensorData_t jsonData;
 static char topic[TOPIC_QUEUE_ITEM_SIZE];
 
-static uint32_t getNodeMmtPeriod(char* nodeName);
+static bool getNodeMmtPeriod(char* nodeName, uint32_t* period);
 static NodeMmtPeriod_t nodesMmtPeriods[MAX_SENSOR_NODES];
 static uint8_t nodesMmtPeriodsCnt = 0;
 TimerHandle_t timerBaseMmtPeriod;
 static void timerBaseMmtPeriodCB(TimerHandle_t xTimer);
 
 static bool extractNodeNameAndPeriod(char* input, char* nodeName, uint32_t* mmtPeriod);
+static bool isRequestingMmtPeriod(char* input, char* nodeName);
 static void addNewNodeMmtPeriod(char nodeName[]);
 static void parseIncomingMqttPayload(char* msg);
 static uint32_t seconds = 0;
@@ -58,7 +59,6 @@ static void taskSensorDataGathering(void *pvParameters)
     BG96_insertAsyncCmd(&subscribeAsyncCmd);
 
     nbiotCreateTaskSensorDataQueueing();
-    ESP_LOGI(tag, "GOING TO CREATE BASE PERIOD TIMER");
 
     timerBaseMmtPeriod = xTimerCreate("timerBaseMmtPeriod",      // Name of timer
                                     MS_TO_TICKS(1000),           // Period of timer (in ticks)
@@ -69,16 +69,10 @@ static void taskSensorDataGathering(void *pvParameters)
     if (timerBaseMmtPeriod != NULL)
     {
         xTimerStart(timerBaseMmtPeriod, MS_TO_TICKS(10));
-        ESP_LOGI(tag, "STARTING TIMER\r\n");
+        ESP_LOGI(tag, "Starting timer with base period: 1s\r\n");
     }
 
-    ESP_LOGI(tag, " is deleting itself.");
     vTaskDelete(NULL);
-
-    // while(1)
-    // {
-    //     TASK_DELAY_MS(5000);
-    // }
 }
 
 void nbiotSensorDataToBg96(NbiotBleMeshNode_t* node, NbiotRecvSensorData_t* dataArr)
@@ -263,11 +257,11 @@ bool nbiotUpdateNodeMmtPeriod(char* nodeName, uint32_t mmtPeriod)
             return true;
         }
     }
-    ESP_LOGI(tag, "Couldn't update node mmt period, node [%s] not found.", nodeName);
+    ESP_LOGI(tag, "Couldn't update node mmt period, node [%s] not online/found.", nodeName);
     return false;
 }
 
-static uint32_t getNodeMmtPeriod(char* nodeName)
+static bool getNodeMmtPeriod(char* nodeName, uint32_t* period)
 {
     static char msg[64];
 
@@ -276,11 +270,13 @@ static uint32_t getNodeMmtPeriod(char* nodeName)
     {
         if (strcmp(nodesMmtPeriods[i].name, nodeName) == 0)
         {
-            return nodesMmtPeriods[i].period;
+            *period = nodesMmtPeriods[i].period;
+            return true;
         }
     }
 
-    return DEFAULT_NODE_MMT_PERIOD_S;
+    *period = DEFAULT_NODE_MMT_PERIOD_S;
+    return false;
 }
 
 static uint32_t getNodeMmtPeriodOffset(char* nodeName)
@@ -336,7 +332,7 @@ static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
         if (nbiotGetNodeByIdx(i, &sensorNode) == EXIT_SUCCESS)
         {
             addNewNodeMmtPeriod(sensorNode->name);
-            nodeMmtPeriod = getNodeMmtPeriod(sensorNode->name);
+            getNodeMmtPeriod(sensorNode->name, &nodeMmtPeriod);
             nodeOffset = getNodeMmtPeriodOffset(sensorNode->name);
 
             if ((seconds - nodeOffset + nodeMmtPeriod - sendFirstAfterSec) % nodeMmtPeriod == 0)
@@ -344,12 +340,12 @@ static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
                 if (sensorNode->propIDsCnt > 0)
                 {
                     nbiotBleMeshGetSensorData(sensorNode->srvAddr);
-                    ESP_LOGI(tag, "\r\nSensors [%s] period: [%d] occured at [%d] sec, from value [%d] because offset is [%d]", 
-                    sensorNode->name, 
-                    nodeMmtPeriod,
-                    seconds, 
-                    (seconds - nodeOffset + nodeMmtPeriod - sendFirstAfterSec),
-                    nodeOffset);
+                    // ESP_LOGI(tag, "\r\nSensors [%s] period: [%d] occured at [%d] sec, from value [%d] because offset is [%d]", 
+                    // sensorNode->name, 
+                    // nodeMmtPeriod,
+                    // seconds, 
+                    // (seconds - nodeOffset + nodeMmtPeriod - sendFirstAfterSec),
+                    // nodeOffset);
                 }
                 else
                 {
@@ -364,45 +360,80 @@ static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
     }
 }
 
+// Callback for async cmd
 static void parseIncomingMqttPayload(char* msg)
 {
     static const char* tag = __func__;
     char nodeName[16];
     uint32_t mmtPeriod;
     SensorData_t jsonPayload;
+    char mmtPeriodStr[16];
+    bool isValidMsg = false;
+    bool isNodeOnline = true;
+    
+    memset(jsonPayload.b, '\0', sizeof(SensorData_t));
+    memset(mmtPeriodStr, '\0', sizeof(mmtPeriodStr));
 
-    if (extractNodeNameAndPeriod(msg, nodeName, &mmtPeriod) == true)
+    if (isRequestingMmtPeriod(msg, nodeName) == true)
     {
-        if (nbiotUpdateNodeMmtPeriod(nodeName, mmtPeriod) == false)
+        if (getNodeMmtPeriod(nodeName, &mmtPeriod) == false)
         {
-            return;
+            isNodeOnline = false;
+            ESP_LOGI(tag, "Requested Sensor Node: [%s] is not online.", nodeName);
         }
- 
-        char *jsonStart = strchr(msg, '{');
-        if (jsonStart == NULL)
-        {
-            return;
-        }
+        isValidMsg = true;
+    }
 
-        const char *jsonEnd = strchr(jsonStart, '}');
-        if (jsonEnd == NULL)
+    if (isValidMsg == false)
+    {
+        if (extractNodeNameAndPeriod(msg, nodeName, &mmtPeriod) == true)
         {
-            return;
+            if (nbiotUpdateNodeMmtPeriod(nodeName, mmtPeriod) == false)
+            {
+                isNodeOnline = false;
+                ESP_LOGI(tag, "Sensor Node: [%s], which period is being updated, is not online.", nodeName);
+            }
+            isValidMsg = true;
         }
-        
-        jsonEnd++;  // include the closing brace
-        size_t jsonLen = jsonEnd - jsonStart;
-        strncpy(jsonPayload.b, jsonStart, jsonLen);
-        jsonPayload.b[jsonLen] = '\0';
+    }
 
-        // Send confirming response, that node's mmt period was updated
-        ESP_LOGI(tag, "SENDING RESPONSE: %s", jsonPayload.b);
-        BG96_sendMqttData("\"BG96_demoThing/mmtPeriods/response\"", jsonPayload);
+    if (isValidMsg == false)
+    {
+        ESP_LOGI(tag, "Wrong format of incoming mqtt json payload.\r\n");
+        return;
+    }
+
+    char* jsonStart = strchr(msg, '{');
+    if (jsonStart == NULL)
+    {
+        ESP_LOGE(tag, "Did not find json start \'{\'");
+        return;
+    }
+    
+    char* periodStart = strstr(jsonStart, "\"period\":");
+    if (periodStart == NULL)
+    {
+        ESP_LOGE(tag, "Did not find \"period\":");
+        return;
+    }
+    periodStart += strlen("\"period\":");
+
+    if (isNodeOnline == true)
+    {
+        snprintf(mmtPeriodStr, sizeof(mmtPeriodStr), "%d", mmtPeriod);
     }
     else
     {
-        ESP_LOGI(tag, "Wrong format of incoming mqtt json payload.\r\n");
+        snprintf(mmtPeriodStr, sizeof(mmtPeriodStr), "%d", NODE_NOT_ONLINE);
     }
+
+    strncpy(jsonPayload.b, jsonStart, periodStart - jsonStart);
+    strncpy(jsonPayload.b + (periodStart - jsonStart), mmtPeriodStr, strlen(mmtPeriodStr));
+    strcat(jsonPayload.b, "}");
+
+    // Send response with node's current mmt period
+    ESP_LOGI(tag, "Sending mqtt response: %s", jsonPayload.b);
+    BG96_sendMqttData("\"BG96_demoThing/mmtPeriods/response\"", jsonPayload);
 }
 
 static bool extractNodeNameAndPeriod(char* input, char* nodeName, uint32_t* mmtPeriod)
@@ -428,6 +459,38 @@ static bool extractNodeNameAndPeriod(char* input, char* nodeName, uint32_t* mmtP
         sscanf(periodStart, "\"period\": %d", mmtPeriod);
         ESP_LOGI(tag, "Node Name: [%s], Mmt period: [%d] seconds", nodeName, *mmtPeriod);
         return true;
+    }
+
+    return false;
+}
+
+static bool isRequestingMmtPeriod(char* input, char* nodeName)
+{
+    static const char* tag = __func__;
+    char* nodeNameStart = NULL;
+    char* periodStart = NULL;
+    char* questionMarkPos = NULL;
+
+    char* jsonStart = strchr(input, '{');
+    char* jsonEnd = strrchr(input, '}');
+    uint16_t jsonLen = jsonEnd - jsonStart + 1;
+    char jsonPayload[jsonLen];
+
+    strncpy(jsonPayload, jsonStart, jsonLen);
+    jsonPayload[jsonLen] = '\0';
+
+    nodeNameStart = strstr(jsonPayload, "\"nodeName\":");
+    periodStart = strstr(jsonPayload, "\"period\":");
+
+    if (nodeNameStart != NULL && periodStart != NULL)
+    {
+        sscanf(nodeNameStart, "\"nodeName\": \"%[^\"]\"", nodeName);
+        questionMarkPos = strchr(periodStart, '?');
+        if (questionMarkPos != NULL) {
+            ESP_LOGI(tag, "Requested period of node: [%s]", nodeName);
+            return true;
+        }
+        return false;
     }
 
     return false;
