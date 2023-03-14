@@ -13,7 +13,7 @@ static NbiotSensorSetup_t sensorNbiotSetup[] =
         .name           = SENSOR_NAME,
         .propName       = "turbidity",
         .propDataType   = NBIOT_INT16,
-        .mmtUnit        = "NTU"         // NTU - Nephelometric Turbidity Units
+        .mmtUnit        = "-"           // Relative change of turbidity (Raw adc value scaled to 0..100)
     }
 };
 

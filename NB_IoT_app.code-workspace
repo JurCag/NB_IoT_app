@@ -30,6 +30,10 @@
 		{
 			"name": "sensor_board_ph",
 			"path": "Sensor_Boards_FW/sensor_board_ph"
+		},
+		{
+			"name": "concentrator_pcb_rev_1_1",
+			"path": "Master_Board_FW/concentrator_pcb_rev_1_1"
 		}
 	],
 	"settings": {
@@ -113,7 +117,15 @@
 			"nbiot_ble_mesh_node_ts300b.h": "c",
 			"sensor_ts300b.h": "c",
 			"nbiot_ble_mesh_node_4502c.h": "c",
-			"sensor_4502c.h": "c"
+			"sensor_4502c.h": "c",
+			"bg96_tcpip.h": "c",
+			"utils.h": "c",
+			"*.ipp": "c",
+			"chrono": "c",
+			"condition_variable": "c",
+			"mutex": "c",
+			"thread": "c",
+			"typeinfo": "c"
 		}
 	}
 }
