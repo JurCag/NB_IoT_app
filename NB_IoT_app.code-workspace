@@ -30,10 +30,6 @@
 		{
 			"name": "sensor_board_ph",
 			"path": "Sensor_Boards_FW/sensor_board_ph"
-		},
-		{
-			"name": "concentrator_pcb_rev_1_1",
-			"path": "Master_Board_FW/concentrator_pcb_rev_1_1"
 		}
 	],
 	"settings": {
@@ -125,7 +121,8 @@
 			"condition_variable": "c",
 			"mutex": "c",
 			"thread": "c",
-			"typeinfo": "c"
+			"typeinfo": "c",
+			"esp_system.h": "c"
 		}
 	}
 }
