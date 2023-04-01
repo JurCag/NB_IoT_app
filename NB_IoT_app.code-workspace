@@ -122,7 +122,8 @@
 			"mutex": "c",
 			"thread": "c",
 			"typeinfo": "c",
-			"esp_system.h": "c"
+			"esp_system.h": "c",
+			"algorithm": "c"
 		}
 	}
 }

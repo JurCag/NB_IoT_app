@@ -21,8 +21,6 @@ void app_main()
 
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {
-        // BG96_mqttCreatePayloadDataQueue();
-
         /* BLE Mesh */
         esp_log_level_set("*", ESP_LOG_INFO);
         nbiotReceivedSensorDataRegisterCB(nbiotSensorDataToBg96);

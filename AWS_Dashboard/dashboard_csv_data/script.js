@@ -378,7 +378,7 @@ async function downloadS3Bucket() {
             );
             // console.log("fromDate: ", fromDate);
             // console.log("toDate: ", toDate);
-            // console.log("fileDate: ", fileDate);
+            console.log("fileDate: ", fileDate);
             return fileDate >= fromDate && fileDate <= toDate;
         });
 
@@ -785,7 +785,7 @@ function drawChart (data, redrawOnUpdate) {
                     zoomType: 'x'
                 },
                 time: {
-                    timezoneOffset: -1 * 60
+                    timezoneOffset: -3 * 60
                 },
                 title: {
                     text: sensorNode,

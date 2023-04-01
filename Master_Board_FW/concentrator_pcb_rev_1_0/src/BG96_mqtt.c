@@ -4,7 +4,7 @@ static uint8_t mqttOpened = 0;
 static uint8_t mqttConnected = 0;
 
 static uint8_t msgID = 1;
-static uint8_t qos = 1;
+static uint8_t qos = QOS1_AT_LEAST_ONCE;
 
 static void mqttInputPayload(char* payload);
 uint8_t isInfoResponseCorrect(char* rxResponse, AtCmd_t* atCmd, uint8_t* paramsArr, uint8_t numOfParams);
@@ -19,7 +19,7 @@ TimerHandle_t timerPubData = NULL;
 static void timerPubDataCB(TimerHandle_t xTimer);
 static uint8_t timerPubDataExpired = 0;
 
-#define PAYLOAD_DATA_QUEUE_LENGTH       (30)
+#define PAYLOAD_DATA_QUEUE_LENGTH       (AT_PACKETS_TX_SCHEDULER_QUEUE_LENGTH)
 #define PAYLOAD_DATA_QUEUE_ITEM_SIZE    (sizeof(PayloadData_t))
 static uint8_t payloadDataQueueStorageArea[PAYLOAD_DATA_QUEUE_LENGTH * PAYLOAD_DATA_QUEUE_ITEM_SIZE];
 static QueueHandle_t payloadDataQueue = NULL;
@@ -38,6 +38,8 @@ static uint8_t numOfSubTopics = 0;
 static TaskHandle_t taskReopenConnHandle = NULL;
 static void taskReopenConn(void* pvParameters);
 static void reopenMqttConnection(void);
+
+uint8_t mqttPayloadDataQueueFull = 0;
 
 static BG96_AsyncCmd_t stateChangeAsyncCmd = 
 {
@@ -182,13 +184,28 @@ void BG96_mqttQueuePayloadData(char* topic, PayloadData_t payloadData)
     {
         sprintf(str, "MQTT Payload Data Queue Num of elements: [%d/%d]\r\n", uxQueueMessagesWaiting(payloadDataQueue), PAYLOAD_DATA_QUEUE_LENGTH);
         dumpDebug(str);
-        if(xQueueSend(payloadDataQueue, payloadData.b, 10) == errQUEUE_FULL)
+        
+        if (mqttPayloadDataQueueFull == 0)
         {
-            dumpInfo("MQTT Payload Data Queue: [FULL]. Payload not inserted.\r\n");
+            if(xQueueSend(payloadDataQueue, payloadData.b, 10) == errQUEUE_FULL)
+            {
+                dumpInfo("MQTT Payload Data Queue: [FULL]. Payload not inserted.\r\n");
+            }
+            if (xQueueSend(topicQueue, tmpTopic.b, 10) == errQUEUE_FULL)
+            {
+                dumpInfo("MQTT Topic Queue: [FULL]. Payload's topic not inserted.\r\n");
+            }
         }
-        if (xQueueSend(topicQueue, tmpTopic.b, 10) == errQUEUE_FULL)
+
+        if(uxQueueSpacesAvailable(payloadDataQueue) <= 1)
         {
-            dumpInfo("MQTT Topic Queue: [FULL]. Payload's topic not inserted.\r\n");
+            dumpInfo("MQTT Payload Data Queue: [LAST FREE ELEMENT]\r\n");
+            mqttPayloadDataQueueFull = 1;
+        }
+        if(uxQueueSpacesAvailable(topicQueue) <= 1)
+        {
+            dumpInfo("MQTT Topic Data Queue: [LAST FREE ELEMENT]\r\n");
+            mqttPayloadDataQueueFull = 1;
         }
     }
     else
@@ -449,6 +466,7 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                     if (xQueueReceive(payloadDataQueue, &payloadData, MS_TO_TICKS(200)) == pdTRUE)
                     {
                         mqttInputPayload(payloadData.b);
+                        mqttPayloadDataQueueFull = 0;
                     }
                     else
                     {
