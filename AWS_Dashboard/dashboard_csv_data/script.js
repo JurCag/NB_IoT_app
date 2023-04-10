@@ -15,6 +15,7 @@ var iotdata;
 var knownPbrNodes = ["NODE-BME280", "NODE-Photoresistor", "NODE-Acs712", "NODE-Mhz19b", "NODE-TS-300B", "NODE-4502c"];
 var updateMmtPetiodResponseReceived = false;
 var nodeMmtPeriods = {};
+const localTimeZoneOffset = new Date().getTimezoneOffset();
 
 // Load AWS credentials
 $(document).ready(function () {
@@ -358,7 +359,7 @@ async function downloadS3Bucket() {
         const fromDate = new Date(document.getElementById("from-date").value);
         fromDate.setHours(0);
         fromDate.setMinutes(0);
-        fromDate.setSeconds(1);
+        fromDate.setSeconds(0);
         const toDate = new Date(document.getElementById("to-date").value);
         toDate.setHours(23);
         toDate.setMinutes(59);
@@ -368,16 +369,15 @@ async function downloadS3Bucket() {
                 .split("/")
                 .slice(-4)
                 .map((part) => parseInt(part));
-            const fileDate = new Date(
-                Date.UTC(
-                    dateParts[0],
-                    dateParts[1] - 1,
-                    dateParts[2],
-                    dateParts[3]
-                )
-            );
-            // console.log("fromDate: ", fromDate);
-            // console.log("toDate: ", toDate);
+                const utcDate = Date.UTC(
+                    dateParts[0], 
+                    dateParts[1] - 1, // in S3 bucket january is 1, but js represents january as 0
+                    dateParts[2], 
+                    dateParts[3]);
+                const fileDate = new Date(utcDate + localTimeZoneOffset * 60 * 1000);
+
+            console.log("fromDate: ", fromDate);
+            console.log("toDate: ", toDate);
             console.log("fileDate: ", fileDate);
             return fileDate >= fromDate && fileDate <= toDate;
         });
@@ -432,7 +432,7 @@ async function getCsvFilesFromS3Bucket(numOfLastFiles) {
             })
             .promise();
         const fileList = fileListResponse.Contents.map((file) => file.Key);
-        
+        console.log("fileList: ", fileList);
         let filteredFiles = [];
 
         if (numOfLastFiles === "all"){
@@ -440,7 +440,7 @@ async function getCsvFilesFromS3Bucket(numOfLastFiles) {
             const fromDate = new Date(document.getElementById("from-date").value);
             fromDate.setHours(0);
             fromDate.setMinutes(0);
-            fromDate.setSeconds(1);
+            fromDate.setSeconds(0);
             const toDate = new Date(document.getElementById("to-date").value);
             toDate.setHours(23);
             toDate.setMinutes(59);
@@ -451,14 +451,16 @@ async function getCsvFilesFromS3Bucket(numOfLastFiles) {
                     .split("/")
                     .slice(-4)
                     .map((part) => parseInt(part));
-                const fileDate = new Date(
-                    Date.UTC(
-                        dateParts[0],
-                        dateParts[1] - 1,
-                        dateParts[2],
-                        dateParts[3]
-                    )
-                );
+                const utcDate = Date.UTC(
+                                dateParts[0], 
+                                dateParts[1] - 1, // in S3 bucket january is 1, but js represents january as 0
+                                dateParts[2], 
+                                dateParts[3]);
+                const fileDate = new Date(utcDate + localTimeZoneOffset * 60 * 1000);
+                console.log("fromDate: ", fromDate);
+                console.log("toDate: ", toDate);
+                console.log("fileDate: ", fileDate);
+
                 return fileDate >= fromDate && fileDate <= toDate;
             });
         } else {
@@ -478,7 +480,7 @@ async function getCsvFilesFromS3Bucket(numOfLastFiles) {
                 const fileDate = new Date(
                     Date.UTC(
                         dateParts[0],
-                        dateParts[1] - 1,
+                        dateParts[1] - 1, // in S3 bucket january is 1, but js represents january as 0
                         dateParts[2],
                         dateParts[3]
                     )
@@ -785,7 +787,7 @@ function drawChart (data, redrawOnUpdate) {
                     zoomType: 'x'
                 },
                 time: {
-                    timezoneOffset: -3 * 60
+                    timezoneOffset: localTimeZoneOffset
                 },
                 title: {
                     text: sensorNode,
