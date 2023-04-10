@@ -43,7 +43,7 @@ static void newNodeProvTimerCB(TimerHandle_t xTimer);
 static NbiotBleMeshNode_t newNode;
 
 // Track provisioned nodes
-static NbiotBleMesh_t nbiotBleMesh;
+static NbiotBleMesh_t nbiotBleMesh; // SW structure that holds all nodes info and their count
 static uint8_t insertNode(NbiotBleMeshNode_t* node);
 static void deleteNode(uint8_t btMacAddr[BD_ADDR_LEN]);
 static uint8_t getNodeByAddr(uint16_t addr, NbiotBleMeshNode_t** retNode);
@@ -344,7 +344,8 @@ static void recvUnprovAdvPkt(uint8_t dev_uuid[ESP_BLE_MESH_OCTET16_LEN],
             device with ADD_DEV_START_PROV_NOW_FLAG set. */
     err = esp_ble_mesh_provisioner_add_unprov_dev(&add_dev,
             ADD_DEV_RM_AFTER_PROV_FLAG | ADD_DEV_START_PROV_NOW_FLAG | ADD_DEV_FLUSHABLE_DEV_FLAG);
-    if (err != ESP_OK) {
+    if (err != ESP_OK) 
+    {
         ESP_LOGE(tag, "Failed to start provisioning device");
     }
 }
@@ -813,7 +814,8 @@ static void sensorDescriptorParser(uint8_t* data, uint16_t length, uint16_t unic
     }
 
 #ifdef NAME_NODES_AFTER_SENSOR_NAME
-    // Update node name according to its sensor name
+    // Update node name according to its sensor name, but this will affect 
+    // only the name of the node stored in the nodes array of SW structure nbiotBleMesh
     char newName[32];
     memset(newName, '\0', sizeof(newName));
     sprintf(newName, "NODE-%s", nodeToUpdate->nbiotSetup[0].name);

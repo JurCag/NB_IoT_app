@@ -86,7 +86,7 @@ void BG96_mqttOpenConn(void)
     static void* paramsArr[MAX_PARAMS];
     static uint8_t idx = 0;
 
-    static char port[] = "8883";
+    static char port[] = "8883"; // MQTT secure TLS port
 
     idx = 0;
     paramsArr[idx++] = (void*) &client_idx;

@@ -17,7 +17,6 @@
 #include "ble_mesh_init.h"
 #include "freertos/timers.h"
 
-
 #define CID_ESP                         0x02E5 // Espressif Company ID
             
 #define PROV_OWN_ADDR                   0x0001
@@ -35,7 +34,7 @@
 
 #define PROP_ID_OMITTED                 0
 
-/* Uncomment to name nodes after their sensor - expects each node has only 1 sensor */
+/* Uncomment to name the nodes after their sensor - expects each node has only 1 sensor */
 #define NAME_NODES_AFTER_SENSOR_NAME
 
 typedef struct

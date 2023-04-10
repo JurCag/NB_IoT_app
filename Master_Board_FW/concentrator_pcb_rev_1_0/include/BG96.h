@@ -37,7 +37,7 @@
 /* Uncomment to gather data from sensor boards through BLE even if GSM modem not present */
 // #define DEBUG_SENSOR_DATA_GATHERING
 
-/* Uncomment to wait after concentrator connects to the network (required due to some network issue probably) */
+/* Uncomment to wait after concentrator connects to the network (better to wait due to some network issue probably) */
 // #define INITIAL_WAIT_PROCEDURE
 
 /* Uncomment to test mqtt publish cmd (sends one payload after initialization) */

@@ -248,8 +248,16 @@ bool nbiotUpdateNodeMmtPeriod(char* nodeName, uint32_t mmtPeriod)
     {
         if (strcmp(nodesMmtPeriods[i].name, nodeName) == 0)
         {
+            // Update node mmt period in SW structure
             nodesMmtPeriods[i].period = mmtPeriod;
             nodesMmtPeriods[i].offset = seconds;
+
+            // Also store updated node mmt period in NVS memory
+            if (nvsWriteItem(&(nodeName[5]), mmtPeriod) == EXIT_FAILURE)
+            {
+                ESP_LOGE(tag, "Error during writing into NVS. Check implementation.");
+            }
+
             ESP_LOGI(tag, "\r\nUpdated node: [%s], period: [%d], time offset: [%d]", 
                     nodesMmtPeriods[i].name,
                     nodesMmtPeriods[i].period,
@@ -263,9 +271,12 @@ bool nbiotUpdateNodeMmtPeriod(char* nodeName, uint32_t mmtPeriod)
 
 static bool getNodeMmtPeriod(char* nodeName, uint32_t* period)
 {
+    static const char* tag = __func__;
     static char msg[64];
 
     memset(msg, '\0', sizeof(msg));
+
+    // First check if it's in SW structure
     for (uint8_t i = 0; i < nodesMmtPeriodsCnt; i++)
     {
         if (strcmp(nodesMmtPeriods[i].name, nodeName) == 0)
@@ -275,7 +286,19 @@ static bool getNodeMmtPeriod(char* nodeName, uint32_t* period)
         }
     }
 
+    // Than check if it's stored in NVS memory
+    // &(nodeName[5]) is used to shorten the store key for NVS (removes "NODE-" from name)
+    if (nvsReadItem(&(nodeName[5]), period) == EXIT_SUCCESS)
+    {
+        return false;
+    }
+
+    // Else return default value and also store it in memory
     *period = DEFAULT_NODE_MMT_PERIOD_S;
+    if (nvsWriteItem(&(nodeName[5]), DEFAULT_NODE_MMT_PERIOD_S) == EXIT_FAILURE)
+    {
+        ESP_LOGE(tag, "Error writing into NVS");
+    }
     return false;
 }
 
@@ -294,25 +317,22 @@ static uint32_t getNodeMmtPeriodOffset(char* nodeName)
 
 static void addNewNodeMmtPeriod(char nodeName[])
 {
+    static const char* tag = __func__;
     NodeMmtPeriod_t newNodeMmtPeriod;
 
     memset(&newNodeMmtPeriod, 0, sizeof(NodeMmtPeriod_t));
     memset(&(newNodeMmtPeriod.name), '\0', sizeof(newNodeMmtPeriod.name));
 
-    // Check if is not already added
-    for (uint8_t i = 0; i < nodesMmtPeriodsCnt; i++)
+    // If false than the node is not added yet
+    if (getNodeMmtPeriod(nodeName, &(newNodeMmtPeriod.period)) == false)
     {
-        if (strcmp(nodesMmtPeriods[i].name, nodeName) == 0)
-        {
-            return;
-        }
-    }
+        memcpy(newNodeMmtPeriod.name, nodeName, strlen(nodeName));
+        newNodeMmtPeriod.offset = seconds;
+        memcpy(&(nodesMmtPeriods[nodesMmtPeriodsCnt]), &newNodeMmtPeriod, sizeof(NodeMmtPeriod_t));
+        nodesMmtPeriodsCnt++;
 
-    memcpy(newNodeMmtPeriod.name, nodeName, strlen(nodeName));
-    newNodeMmtPeriod.period = DEFAULT_NODE_MMT_PERIOD_S;
-    newNodeMmtPeriod.offset = seconds;
-    memcpy(&(nodesMmtPeriods[nodesMmtPeriodsCnt]), &newNodeMmtPeriod, sizeof(NodeMmtPeriod_t));
-    nodesMmtPeriodsCnt++;
+        ESP_LOGI(tag, "[SUCCESS] adding new node: [%s] with mmt period: [%d]", newNodeMmtPeriod.name, newNodeMmtPeriod.period);
+    }
 }
 
 static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
@@ -486,7 +506,8 @@ static bool isRequestingMmtPeriod(char* input, char* nodeName)
     {
         sscanf(nodeNameStart, "\"nodeName\": \"%[^\"]\"", nodeName);
         questionMarkPos = strchr(periodStart, '?');
-        if (questionMarkPos != NULL) {
+        if (questionMarkPos != NULL)
+        {
             ESP_LOGI(tag, "Requested period of node: [%s]", nodeName);
             return true;
         }

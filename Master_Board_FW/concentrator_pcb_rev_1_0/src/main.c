@@ -16,8 +16,9 @@ void app_main()
     UART_installDriver(UART_BG96);
 
     char str[64];
-    sprintf(str, "\r\nConfig FreeRTOS freq = %d Hz\r\n", CONFIG_FREERTOS_HZ);
+    sprintf(str, "\r\nConfig FreeRTOS freq = [%d] Hz\r\n", CONFIG_FREERTOS_HZ);
     UART_writeStr(UART_PC, str);
+    TASK_DELAY_MS(2000);
 
     if(CONFIG_FREERTOS_HZ == DESIRED_FREERTOS_FREQ)
     {
@@ -36,11 +37,11 @@ void app_main()
         /* Create FreeRTOS tasks */
         createTaskRx();
         createTaskPowerUpModem(PWRKEY_PIN);
-
     }
     else
     {
-        sprintf(str, "\r\n[PROBLEM] Set CONFIG_FREERTOS_HZ = %d Hz in menuconfig\r\n", DESIRED_FREERTOS_FREQ);
+        sprintf(str, "\r\n[PROBLEM] Set CONFIG_FREERTOS_HZ = [%d] Hz in menuconfig\r\n", 
+                DESIRED_FREERTOS_FREQ);
         UART_writeStr(UART_PC, str);
     }
 }

@@ -123,7 +123,11 @@
 			"thread": "c",
 			"typeinfo": "c",
 			"esp_system.h": "c",
-			"algorithm": "c"
+			"algorithm": "c",
+			"nvs_flash.h": "c",
+			"nvs.h": "c",
+			"nvs_memory.h": "c",
+			"nbiot_ble_mesh_bg96_interface.h": "c"
 		}
 	}
 }

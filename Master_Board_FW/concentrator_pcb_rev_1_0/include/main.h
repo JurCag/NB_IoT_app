@@ -6,6 +6,7 @@
 #include <soc/uart_struct.h>
 #include <soc/uart_reg.h>
 #include <string.h>
+#include "nvs_memory.h"
 
 #include "nbiot_ble_mesh_provisioner_client.h"
 #include "nbiot_ble_mesh_bg96_interface.h"
