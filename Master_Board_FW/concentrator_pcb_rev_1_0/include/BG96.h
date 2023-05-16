@@ -38,7 +38,7 @@
 // #define DEBUG_SENSOR_DATA_GATHERING
 
 /* Uncomment to wait after concentrator connects to the network (better to wait due to some network issue probably) */
-// #define INITIAL_WAIT_PROCEDURE
+#define INITIAL_WAIT_PROCEDURE
 
 /* Uncomment to test mqtt publish cmd (sends one payload after initialization) */
 // #define TEST_MQTT_PUBLISH
@@ -52,11 +52,8 @@
 /* Uncomment to see debug logging (default commented) */
 #define DUMP_DEBUG
 
-/* Uncomment to perform upload datarate test of NB IoT by sending random byte fixed-length payloads (default commented) */
-// #define TEST_NBIOT_UPLOAD_DATARATE
-
-/* Uncomment to perform 1MB data upload test of overhead, but make sure TEST_NBIOT_UPLOAD_DATARATE is commented (default commented)*/
-// #define TEST_NBIOT_1MB_UPLOAD_OVERHEAD
+/* Uncomment to perform 1MB data upload test (default commented)*/
+// #define TEST_NBIOT_1MB_UPLOAD
 #define ONE_TEST_MSG_LEN (1024)
 
 /* Typedefs */ 

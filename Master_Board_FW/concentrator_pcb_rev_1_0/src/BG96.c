@@ -44,19 +44,13 @@ static void taskAtPacketTxScheduler(void* pvParameters);
 static void createTaskMqttPubData(void);
 static void createTaskAtPacketTxScheduler(void);
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-static TaskHandle_t taskTestNbiotDatarateHandle = NULL;
-static void taskTestNbiotDatarate(void* pvParameters);
-static void createTaskTestNbiotDatarate(void);
-#endif
-
-#ifdef TEST_NBIOT_1MB_UPLOAD_OVERHEAD
+#ifdef TEST_NBIOT_1MB_UPLOAD
 #define STACK_SIZE (8192+4096)
-static StaticTask_t taskTestNbiotOverheadBuffer;
-static StackType_t taskTestNbiotOverheadStack[STACK_SIZE];
-static TaskHandle_t taskTestNbiotOverheadHandle = NULL;
-static void taskTestNbiotOverhead(void *pvParameters);
-static void createTaskTestNbiotOverhead(void);
+static StaticTask_t taskTestNbiotUploadBuffer;
+static StackType_t taskTestNbiotUploadStack[STACK_SIZE];
+static TaskHandle_t taskTestNbiotUploadHandle = NULL;
+static void taskTestNbiotUpload(void *pvParameters);
+static void createTaskTestNbiotUpload(void);
 #endif
 
 /* Local functions */
@@ -79,7 +73,7 @@ void BG96_txStr(char* str)
 {
     UART_writeStr(UART_BG96, str);
 
-    dumpInterComm("[BG96 <-] ");
+    dumpInterComm("[-> BG96] ");
     dumpInterComm(str);
 }
 
@@ -184,7 +178,7 @@ void createTaskFeedTxQueue(void)
     xReturned = xTaskCreate(
                 taskFeedTxQueue,                /* Task function */
                 "taskFeedTxQueue",              /* Name of task */
-                8192,                           /* Stack size of task */
+                8192 + 2048,                           /* Stack size of task */
                 NULL,                           /* Parameter of the task */
                 tskIDLE_PRIORITY + 1,           /* Priority of the task */
                 &taskFeedTxQueueHandle          /* Handle of created task */
@@ -229,35 +223,21 @@ static void createTaskMqttPubData(void)
     }
 }
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-static void createTaskTestNbiotDatarate(void)
+#ifdef TEST_NBIOT_1MB_UPLOAD
+static void createTaskTestNbiotUpload(void)
 {
-    xTaskCreate(
-                taskTestNbiotDatarate,          /* Task function */
-                "taskTestNbiotDatarate",        /* Name of task */
-                8192 + 4096,                           /* Stack size of task */
-                NULL,                           /* Parameter of the task */
-                tskIDLE_PRIORITY + 1,           /* Priority of the task */
-                &taskTestNbiotDatarateHandle    /* Handle of created task */
-                );
-}
-#endif
-
-#ifdef TEST_NBIOT_1MB_UPLOAD_OVERHEAD
-static void createTaskTestNbiotOverhead(void)
-{
-    taskTestNbiotOverheadHandle = xTaskCreateStatic(
-                      taskTestNbiotOverhead,        /* Function that implements the task. */
-                      "taskTestNbiotOverhead",      /* Text name for the task. */
+    taskTestNbiotUploadHandle = xTaskCreateStatic(
+                      taskTestNbiotUpload,        /* Function that implements the task. */
+                      "taskTestNbiotUpload",      /* Text name for the task. */
                       STACK_SIZE,                   /* Number of indexes in the xStack array. */
                       NULL,                         /* Parameter passed into the task. */
                       tskIDLE_PRIORITY + 1,         /* Priority at which the task is created. */
-                      taskTestNbiotOverheadStack,   /* Array to use as the task's stack. */
-                      &taskTestNbiotOverheadBuffer  /* Variable to hold the task's data structure. */
+                      taskTestNbiotUploadStack,   /* Array to use as the task's stack. */
+                      &taskTestNbiotUploadBuffer  /* Variable to hold the task's data structure. */
                       );
-    if (taskTestNbiotOverheadHandle == NULL)
+    if (taskTestNbiotUploadHandle == NULL)
     {
-        dumpInfo("Failed to create [taskTestNbiotOverhead]\r\n");
+        dumpInfo("Failed to create [taskTestNbiotUpload]\r\n");
     }
 }
 #endif
@@ -404,6 +384,7 @@ static void taskFeedTxQueue(void* pvParameters)
     BG96_sslConfigParams();
     BG96_mqttConfigParams();
     BG96_tcpipConfigParams();
+    // TASK_DELAY_MS(8000);
     BG96_tcpipActivatePDP();
 
     // Mqtt connection
@@ -438,14 +419,12 @@ static void taskFeedTxQueue(void* pvParameters)
     BG96_mqttPubQueuedData(); 
 #endif
 
+    gpio_set_level(USER_LED_1, 1);
     createTaskMqttPubData();
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-    createTaskTestNbiotDatarate();
-    dumpDebug("Creating task createTaskTestNbiotDatarate\r\n");
-#elif defined(TEST_NBIOT_1MB_UPLOAD_OVERHEAD)
-    createTaskTestNbiotOverhead();
-    dumpDebug("Creating task createTaskTestNbiotOverhead\r\n");
+#ifdef TEST_NBIOT_1MB_UPLOAD
+    createTaskTestNbiotUpload();
+    dumpDebug("Creating task createTaskTestNbiotUpload\r\n");
 #else
     // Sensor data gathering and comm over mqtt
     dumpDebug("Ready to receive sensor data\r\n");
@@ -871,73 +850,13 @@ void BG96_sendMqttData(char* topic, SensorData_t data)
     }
 }
 
-#ifdef TEST_NBIOT_UPLOAD_DATARATE
-static void taskTestNbiotDatarate(void *pvParameters)
-{
-    static SensorData_t sensorData;
-    static char testTopic[32];
-
-    memset(testTopic, '\0', sizeof(testTopic));
-    strcpy(testTopic, "\"testUploadDataRate\"");
-
-    dumpDebug("START TEST NBIOT UPLOAD DATARATE\r\n");
-    TASK_DELAY_MS(4000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{\"T4z51xCHBir1hlUqFp420YyRyw\":%d}", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(testTopic, sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{\"igXuJITXrW191oYuCvwm7o1EvbNiL6RF1VNwyo99cBueTxkzM6g8NP3GyZDdxKOYhpeey1MkKXRd8TDOilRVmzQZywQBPcBaGwHXaoMhAZsCcCojEpvaDC15uv\":%d}", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(testTopic, sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{\"GKGQXKGlYWQ4BljBgPvWGuZVZxJf2SEqSt0iZDfgXi8Lc9esnCBOzm7c8vrNwyOBM6r2PbOI2q2Vhp4Ac1nkWiDPWmEQUAdp1Wc1ZdRRyY4JYQUaySTtjYL7b9gQrVMg1E1gxs9JkvWjiniPpq9SoQNbz1SF4pete3t9jiThwt7L8pFfLaXBbza2MU8JzsEPONjX2RojR25lFaZrJU5dUQY7jfAjYRWKI1dmU21frSA2MVeJ5h2C8J4Y3c\":%d}", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(testTopic, sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{\"SnvCmbFPViXzb3OnQun67vnkTqK88oVrQEUYa7eNN5j5nlTC9NNyEC56ECArdWYBOUTUwVRyGwdmbbaDBnxsgkKSe0AAlvgWJ3xQbmDiGNyHx436seINAPjnuRTXU0PFKvSAeJGMx0YQvoJRj02v7r4I35zHtU0R5Cfhg2XZKwPBIuy7XfvkuLLE1KfNtrqVgCfmzR5yV5GAJcQ7QUpRQwqq7Rp41omdLdJCS8qd3nl7WrJdVwqKl9DRZ5vKLpjz3UpB3aeMIZ3RuP27Ae6IRfAUyXisxaaKVwIEhekGtiYkUOHMGBErOVtAID07enl8a4Bsn3qPmTRCfXKcsoDoE5zt6kK0Sn1b6lDUARnDeoNhR53RJpP2Ke5D00L1JBWpwKnGpn6ejOB3relF4v2ceIO3XAodRvQZ65m5VLmTKo4srY0goReiZxtZOljrTFMwWs0Av9bdHoSxsWH7Rd129bmVauZ0T12deMOibC3WxfpzpOM5DKgM0Rosae\":%d}", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(testTopic, sensorData);
-    }
-    TASK_DELAY_MS(7000);
-    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
-    for (uint8_t i = 0; i < 12; i++)
-    {
-        memset(sensorData.b, '\0', sizeof(sensorData.b));
-        sprintf(sensorData.b, "{\"TLAlvIWblFnpJLuYMBqNz3sHMBjvnqDKXwitku7LYAISQs5XHbyCxwGtkOxdoA3YlV71OGH7iXLa6dNBhbLTFz3XsVE654oI9pP6dMBBwnH5PlNVMt9DHYwLcY1eTxYljEPBKZhJNX3NFt1tjrQwduAJ7K2Ers0xtDXOcrdzzn811dxtBKIP7VqKo0O0gvUUtFBT2k5h86DtsEZ7qJoBSNkKgmk1ZPksywRyCNz5TzGPa2R1N2rSpKc5VEiRtDFSJ4pfE53oSuSmGtAcP1MBfWpEWsYsRTMsWUnEzazmI0GDM64gwVBSm1cVtAjbu9VHAUj98CsJspo8nKClPuEl0TNJgtzLHj2KnniLi6sq7sigszQQZSOkdzhHT7exQKf7E788dA9KADSKBqRp7JBq6FwIakXaPYkZkVxcVjKsOX7qL8up4L3WWh7pngBvtUCHeZfW99Lh2VQKdRYAHJ8pG6skEwM1UMCzatfKkj1IXtOR5qeB3UaHyCBEDVCRdmUn0H5NB5tOFVMZ2m3paT7Mc1ybSOlbXTQkWyk1cU97evSL5QrrWq1Nq7FW9oAy8NIxtvutjXZWO3UX1blnWMO6rrtzJysFVy36KXIBBwX0PUNKcQTWNEF9yB8dsN4YOGpz9lCBcea2kJuVP5AyTMAiNPCRco7nPsQRmeWXwxxHZJoQ5VUiwsODBP2FVyrCjHj9vegmTAVPDGIB0ccPNSAVk7nRH3ibYU3dckTZP7Cgdz0sOGhlIjL1zFHX1mbOJEDqoJkImklaFnqcxuDcM9kc2p4F5mnXci2rOOF6Hwr2hgvj3M9tCeqpqzypReXE7cuzImw5FTklySdb3rA3Fy0M0AhGeNUcievzresDvdrdwO0ksRh8u8MzFI7EOo8TXeuUUB6qWmyvfUmUhG0gBlZYQsltqvyxHxexxRuogYuHKvH3UTIFAMvAnHviFUicpAtAagtFxCzCzQmzwlO2a8ltiSyQpCztjUTbKMuOldkMrXgSQnTU6h8w9EuKPp\":%d}", i%10);
-        dumpDebug(sensorData.b);
-        BG96_sendMqttData(testTopic, sensorData);
-    }
-    dumpDebug("FINISH TEST NBIOT UPLOAD DATARATE\r\n");
-    vTaskDelete(NULL);
-}
-#endif
-
-#ifdef TEST_NBIOT_1MB_UPLOAD_OVERHEAD
+#ifdef TEST_NBIOT_1MB_UPLOAD
 
 #define FORMATTING_CHARS (11)
 static char padding[ONE_TEST_MSG_LEN - FORMATTING_CHARS];
 static uint16_t testMsgsCount = (1024 * 1024) / ONE_TEST_MSG_LEN; // (1MB / ONE_TEST_MSG_LEN)
 
-static void taskTestNbiotOverhead(void *pvParameters)
+static void taskTestNbiotUpload(void *pvParameters)
 {
     static char testTopic[32];
     static SensorData_t msg1kB;
@@ -948,7 +867,9 @@ static void taskTestNbiotOverhead(void *pvParameters)
     memset(testTopic, '\0', sizeof(testTopic));
     strcpy(testTopic, "\"testUploadOverhead\"");
 
-    dumpInfo("TEST NBIOT UPLOAD OVERHEAD: [START]\r\n");
+    queueAtPacket(&AT_signalQualityReport, EXECUTION_COMMAND);
+
+    dumpInfo("TEST NBIOT UPLOAD: [START]\r\n");
     TickType_t startTime = xTaskGetTickCount();
     for (uint16_t i = 1; i <= testMsgsCount; i++)
     {
@@ -1010,7 +931,7 @@ static void taskTestNbiotOverhead(void *pvParameters)
     float elapsedTimeSeconds = (float)elapsedTime / (float)ticksPerSecond;
     printf("Elapsed time: %f seconds\r\n", elapsedTimeSeconds);
 
-    dumpInfo("TEST NBIOT UPLOAD OVERHEAD: [FINISHED]\r\n");
+    dumpInfo("TEST NBIOT UPLOAD: [FINISHED]\r\n");
     vTaskDelete(NULL);
 }
 #endif

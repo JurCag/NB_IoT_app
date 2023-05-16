@@ -4,6 +4,7 @@ void app_main()
 {
     /* IO */
     initIO();
+    gpio_set_level(USER_LED_1, 0);
     
     /* UART with PC */
     UART_initConfig(UART_PC);

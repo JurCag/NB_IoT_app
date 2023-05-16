@@ -479,6 +479,7 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                     if ((strstr(rxData.b, payloadData.b) != NULL) && (strstr(rxData.b, "OK") != NULL))
                     {
                         dumpInfo("MQTT payload: [SUCCESS]\r\n");
+                        gpio_set_level(USER_LED_2, 0);
 
                         memset(rxData.b, '\0', sizeof(rxData.b));
                         if (xQueueReceive(rxDataQueue, &rxData, MS_TO_TICKS(tempPacket.atCmd.maxRespTime_ms)) == pdTRUE)
@@ -490,6 +491,7 @@ uint8_t BG96_mqttResponseParser(BG96_AtPacket_t* packet, char* data)
                             if (isInfoResponseCorrect(rxData.b, &(tempPacket.atCmd), expInfoArgs, i) == EXIT_SUCCESS)
                             {
                                 dumpInfo("MQTT publish: [SUCCESS]\r\n");
+                                gpio_set_level(USER_LED_2, 1);
                                 resendPayload = 0;
                                 mqttPublishFailsInRow = 0;
                                 return EXIT_SUCCESS;
@@ -586,6 +588,7 @@ static void parseStateChangeInMqttLinkLayer(char* msg)
     {
     case TCPIP_CONN_CLOSED:
         dumpInfo("PDP connection is closed or reset by peer.\r\n");
+        BG96_mqttCreateTaskReopenConnection();
         break;
     case TCPIP_PINGREQ_PACK_TIMEDOUT:
         dumpInfo("Sending PINGREQ packet timedout or failed.\r\n");
@@ -633,6 +636,7 @@ static void taskReopenConn(void* pvParameters)
 
 static void reopenMqttConnection(void)
 {
+    gpio_set_level(USER_LED_1, 0);
     BG96_pauseSendMqttData();
     dumpInfo("Trying to REOPEN MQTT CONNECTION\r\n");
 

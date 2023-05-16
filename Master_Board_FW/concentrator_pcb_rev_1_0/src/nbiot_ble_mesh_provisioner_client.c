@@ -1,3 +1,10 @@
+/*
+ * Description: Code implements BLE mesh provisioner and sensor client models.
+ * 
+ * Parts of this code were inspired by and modified from the examples in the Espressif ESP-IDF repository.
+ * Original Source: https://github.com/espressif/esp-idf/tree/master/examples
+ */
+
 #include "nbiot_ble_mesh_provisioner_client.h"
 
 #define COMP_DATA_1_OCTET(msg, offset)      (msg[offset])

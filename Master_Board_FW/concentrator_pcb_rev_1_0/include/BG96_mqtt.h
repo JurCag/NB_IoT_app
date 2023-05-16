@@ -7,6 +7,7 @@
 #include "AT_cmds.h"
 #include "freertos/timers.h"
 #include "BG96_tcpip.h"
+#include "board.h"
 
 typedef SensorData_t PayloadData_t;
 

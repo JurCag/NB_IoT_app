@@ -1,3 +1,10 @@
+/*
+ * Description: Code implements BLE mesh configuration and sensor server models.
+ * 
+ * Parts of this code were inspired by and modified from the examples in the Espressif ESP-IDF repository.
+ * Original Source: https://github.com/espressif/esp-idf/tree/master/examples
+ */
+
 #include "server_include/nbiot_ble_mesh_server.h"
 
 /* LOCAL FUNCTIONS DECLARATION */

@@ -347,10 +347,39 @@ static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
     seconds += 1;
     nodesCnt = nbiotGetNodesCnt();
 
+
+    // gpio_set_level(USER_LED_1, 1);
     for (uint8_t i = 0; i < nodesCnt; i++)
     {
         if (nbiotGetNodeByIdx(i, &sensorNode) == EXIT_SUCCESS)
         {
+            char nodeSensorName[16];
+            strcpy(nodeSensorName, &(sensorNode->name[5]));
+            if (nodeSensorName[0] == '\0' || nodeSensorName == NULL)
+            {
+                printf("\r\nNODE NAME Is EMPTY or NULL\r\n");
+                continue;
+            }
+            else
+            {
+                uint8_t charIdx;
+                if (strlen(nodeSensorName) == 2)
+                {
+                    for (charIdx = 0; charIdx < 2; charIdx++)
+                    {
+                        if (nodeSensorName[charIdx] < '0' || nodeSensorName[charIdx] > '9')
+                        {
+                            break;
+                        }
+                    }
+                    if (charIdx == 2)
+                    {
+                        printf("[%s] is not updated sensor name!!\r\n", nodeSensorName);
+                        continue;
+                    }
+                }
+            }
+
             addNewNodeMmtPeriod(sensorNode->name);
             getNodeMmtPeriod(sensorNode->name, &nodeMmtPeriod);
             nodeOffset = getNodeMmtPeriodOffset(sensorNode->name);
@@ -359,7 +388,11 @@ static void timerBaseMmtPeriodCB(TimerHandle_t xTimer)
             {
                 if (sensorNode->propIDsCnt > 0)
                 {
+                    /* REQUEST MMT DATA FROM SENSOR NODE */
                     nbiotBleMeshGetSensorData(sensorNode->srvAddr);
+                    // gpio_set_level(USER_LED_1, 0);
+                    
+                    // ESP_LOGI(tag, "\r\nSensors [%s] period: [%d] occured", sensorNode->name, nodeMmtPeriod);
                     // ESP_LOGI(tag, "\r\nSensors [%s] period: [%d] occured at [%d] sec, from value [%d] because offset is [%d]", 
                     // sensorNode->name, 
                     // nodeMmtPeriod,
