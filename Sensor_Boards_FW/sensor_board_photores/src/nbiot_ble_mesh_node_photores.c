@@ -13,7 +13,7 @@ static NbiotSensorSetup_t sensorNbiotSetup[] =
         .name           = SENSOR_NAME,
         .propName       = "light intensity",
         .propDataType   = NBIOT_FLOAT,
-        .mmtUnit        = "%"
+        .mmtUnit        = "lx"
     }
 };
 

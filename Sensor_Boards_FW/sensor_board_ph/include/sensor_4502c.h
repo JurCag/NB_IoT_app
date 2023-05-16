@@ -12,6 +12,9 @@
 #define MAX_SENSOR_SUPPLY_VOLTAGE   (4.7000)    // should be 5V but esp +5V pin has 4.7V
 #define VOLTAGE_DIVIDER_RATIO       (1.0/2.0)
 
+#define LIN_GAIN                    (0.536)
+#define LIN_OFFSET                  (2.247)
+
 // Voltage scale
 #define SENSOR_VOLTAGE_SCALE  (5.0)   // [V]
 

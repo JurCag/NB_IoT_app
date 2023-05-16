@@ -58,9 +58,12 @@ static float sensorGetRealVoltage(void)
 
 static float voltageToPh(float voltage)
 {
+    float uncalibrated = (14.0 * (1.0 - (voltage / MAX_SENSOR_SUPPLY_VOLTAGE)) );
+    float calibrated = (1.0 / LIN_GAIN) * (uncalibrated - LIN_OFFSET);
     // Votlage  < 0 ; MAX_SENSOR_SUPPLY_VOLTAGE >
     // pH       < 0 ; 14.0 >
-    return (((voltage / MAX_SENSOR_SUPPLY_VOLTAGE) * 14.0) - 1.675); // just offset at pH=7, but gain (slope) should be compensated as well 
+    // return (((voltage / MAX_SENSOR_SUPPLY_VOLTAGE) * 14.0) - 1.675); // just offset at pH=7, but gain (slope) should be compensated as well 
+    return calibrated;
 }
 
 static void taskDataAcq(void *pvParameters)

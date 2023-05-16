@@ -1,6 +1,6 @@
 #include "nbiot_ble_mesh_node_4502c.h"
 
-#define SENSOR_NAME                 ("PH-4502C")
+#define SENSOR_NAME                 ("4502c")
 
 NET_BUF_SIMPLE_DEFINE_STATIC(phSensorData, 4);
 

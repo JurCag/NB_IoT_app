@@ -53,7 +53,7 @@ float sensorAcs712GetCurrent(void)
     static float theoreticalVal;
     static float linCalibratedVal;
     theoreticalVal = (((float)mvAvg / VOLTAGE_DIVIDER_RATIO) - ACS712_0A_OUTPUT_VOLTAGE) / ACS712_SENSITIVITY;
-    linCalibratedVal = (1.0 / LIN_CALIB_GAIN) * theoreticalVal - LIN_CALIB_OFFSET;
+    linCalibratedVal = (1.0 / LIN_CALIB_GAIN) * (theoreticalVal - LIN_CALIB_OFFSET);
     return linCalibratedVal;
     // return ((((float)mvAvg) * 0.02074f) - 24.27);
 }
