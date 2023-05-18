@@ -1,0 +1,33 @@
+Id;Designator;Package;Quantity;Designation;Supplier and ref
+1;D3;D_MiniMELF;1;BZV55C15;https://www.tme.eu/cz/details/bzv55c15-cdi/zenerovy-diody-smd/cdil/bzv55c15/
+2;D4,D5;SOT-143_Handsoldering;2;PRTR5V0U2X;https://www.tme.eu/cz/sk/details/prtr5v0u2x.215/bezpecnostne-diody-rebriky/nexperia/
+3;J2;USB_Micro-B_Amphenol_10118194_Horizontal;1;USB_UART;https://cz.mouser.com/ProductDetail/Hirose-Connector/ZX62D-B-5PA830?qs=1Nn7v2rJFSJs6IftS%252BmZAw%3D%3D
+4;C5,C3;CP_Radial_D5.0mm_P2.00mm;2;100uF/10V;
+5;LED2;D_0805_2012Metric_Pad1.15x1.40mm_HandSolder;1;USER LED 2;
+6;D8;D_0805_2012Metric_Pad1.15x1.40mm_HandSolder;1;PWR LED;
+7;Q1,Q2;SOT-23;2;BC817;
+8;R11,R10,R9;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;3;10k(1%);
+9;J3,J6;PinSocket_1x08_P2.54mm_Vertical;2;Conn_01x08_Female;
+10;D7;D_0805_2012Metric_Pad1.15x1.40mm_HandSolder;1;RX LED;
+11;C13,C14,C2,C8,C10,C11;C_0603_1608Metric_Pad1.08x0.95mm_HandSolder;6;100nF/50V;
+12;R12,R8,R3,R7;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;4;1k;
+13;U1;QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm;1;CP2102N-Axx-xQFN28;
+14;LED1;D_0805_2012Metric_Pad1.15x1.40mm_HandSolder;1;USER LED 1;
+15;J4,J5;PinSocket_1x05_P2.54mm_Vertical;2;Conn_01x05;
+16;R1;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;1;22.1k;
+17;D6;D_0805_2012Metric_Pad1.15x1.40mm_HandSolder;1;TX LED;
+18;D1,D2;SOD3715X145N;2;1N5819HW;https://www.tme.eu/cz/sk/details/1n5819hw-7-f/diody-schottky-smd/diodes-incorporated/
+19;RST1,BOOT1;SW_PUSH_6mm_H5mm;2;SW_Push;
+20;U3;ESP32-C3-WROOM-02;1;ESP32-C3-WROOM-02;
+21;C4;C_0603_1608Metric_Pad1.08x0.95mm_HandSolder;1;1uF/50V;
+22;J1;USB_Micro-B_Amphenol_10118194_Horizontal;1;USB;https://cz.mouser.com/ProductDetail/Hirose-Connector/ZX62D-B-5PA830?qs=1Nn7v2rJFSJs6IftS%252BmZAw%3D%3D
+23;R2;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;1;47.5k;
+24;U2;SOT-223-3_TabPin2;1;LD1117S33TR_SOT223;https://www.tme.eu/cz/details/ld1117s33ctr/stabilizatory-napeti-neregulovane-ldo/stmicroelectronics/
+25;F1;FP_for_SD050-16_POLY_FUSE;1;SD050-16_Poly_Fuse;http://www.tme.eu/cz/details/sd050-16/polymerove-pojistky-smd/ece/
+26;R5,R4;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;2;0(1%);
+27;R13,R14;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;2;1k(NC);
+28;C9;C_1206_3216Metric_Pad1.33x1.80mm_HandSolder;1;10uF/50V;
+29;R6;R_0603_1608Metric_Pad0.98x0.95mm_HandSolder;1;0(1%)(NC);
+30;C6;C_1206_3216Metric_Pad1.33x1.80mm_HandSolder;1;1uF/50V;
+31;C1;C_1210_3225Metric_Pad1.33x2.70mm_HandSolder;1;4.7uF;
+32;C12,C7;C_0805_2012Metric_Pad1.18x1.45mm_HandSolder;2;10uF/50V;
