@@ -1,10 +1,20 @@
 # NB-IoT Application
 
+Table of contents:
+- [WEB APP](#web-app)
+- [FIRMWARE](#firmware)
+  - [NB-IoT Concentrator](#nb-iot-concentrator)
+  - [Sensor Boards](#sensor-boards)
+
 **Introduction:**<br />
 Project showcases the application of NB-IoT technology for uploading data to the cloud. 
 It involves an NB-IoT concentrator and 6 sensor nodes equipped with different sensors, specifically designed to measure parameters of a [photobioreactor](https://en.wikipedia.org/wiki/Photobioreactor).<br />
+Simple concept of the application including PBR is available [here](https://github.com/JurCag/NB_IoT_app/blob/master/images/photobioreactor.svg)
 
+**System architecture:<br />**
+<div align="center">
 <img src="https://github.com/JurCag/NB_IoT_app/raw/master/images/system_architecture.svg" width="580" alt="System Architecture">
+</div>
 
 ## WEB APP
 
@@ -15,6 +25,8 @@ Simple web application for sensor data visualization and control of NB-IoT conce
 - AWS SDK: to access AWS services
 - JSZip: to manipulate ZIP files
 - Highcharts: data visualization
+
+<img src="https://github.com/JurCag/NB_IoT_app/raw/master/images/NB-IoT_dashboard.png" >
 
 ## FIRMWARE
 
@@ -65,6 +77,8 @@ Simplifed design of their firmware is shown in the diagram below:
 **Hardware:**<br />
  - **Control board:<br />**
  Each sensor node has the same control board: [ESP32-C3-DevKitC-02](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html)
+
+<img src="https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/_images/esp32-c3-devkitc-02-v1-annotated-photo.png">
 
  - **Sensors:<br />**
 
